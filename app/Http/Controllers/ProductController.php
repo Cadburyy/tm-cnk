@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
+use App\Models\ProductCsvRow;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
@@ -44,9 +47,36 @@ class ProductController extends Controller
             ->with('success', 'Product created successfully.');
     }
 
-    public function show(Product $product): View
+    public function show(Request $request, Product $product): View
     {
-        $csvData = $product->csvRows()->get()->toArray();
+        $csvData = [];
+        $query = $product->csvRows();
+        
+        // Get the authenticated user
+        $user = Auth::user();
+
+        // Check if the user's name exists as a supplier code in the database
+        $isSupplier = false;
+        if ($user) {
+            $supplierCount = ProductCsvRow::where('supplier', $user->name)->count();
+            if ($supplierCount > 0) {
+                $isSupplier = true;
+                // If the user is a supplier, filter the query by their supplier code
+                $query->where('supplier', $user->name);
+            }
+        }
+        
+        // Apply the order_code filter if it's provided in the request
+        if ($request->filled('order_code')) {
+            $query->where('order_code', 'like', '%' . $request->input('order_code') . '%');
+        }
+
+        // Only retrieve data if a search was performed or if the user is a supplier
+        if ($request->filled('order_code') || $isSupplier) {
+            $csvData = $query->get()->toArray();
+        }
+
+        // Pass the data to the view
         return view('products.show', compact('product', 'csvData'));
     }
 
@@ -73,47 +103,87 @@ class ProductController extends Controller
             $data['csv_file'] = $path;
             $product->update($data);
 
+            // Clear old CSV data
             $product->csvRows()->delete();
 
+            // Helper function to clean and convert numeric strings
+            $convertNumber = function ($numStr) {
+                if (!is_string($numStr)) return $numStr;
+                // Replace thousands separator and decimal comma
+                $numStr = str_replace('.', '', $numStr);
+                $numStr = str_replace(',', '.', $numStr);
+                return is_numeric($numStr) ? (float)$numStr : null;
+            };
+
+            // Helper function to convert percentage strings
+            $convertPercentage = function ($percentStr) use ($convertNumber) {
+                if (!is_string($percentStr)) return $percentStr;
+                $percentStr = str_replace('%', '', $percentStr);
+                return $convertNumber($percentStr);
+            };
+
             if (($handle = fopen(storage_path("app/public/{$path}"), 'r')) !== false) {
-                $header = fgetcsv($handle, 1000, ',');
-                if ($header !== false) {
-                    // Normalize headers: lowercase + underscores instead of spaces
-                    $header = array_map(function ($h) {
-                        return strtolower(str_replace(' ', '_', trim($h)));
-                    }, $header);
+                // The delimiter is a semicolon, not a tab
+                $csvHeaders = fgetcsv($handle, 1000, ';');
 
-                    while (($row = fgetcsv($handle, 1000, ',')) !== false) {
-                        if (count($header) !== count($row)) {
-                            continue; // skip rows with mismatch columns
+                // Map CSV headers to database column names
+                $mapping = [
+                    'Supplier' => 'supplier',
+                    'Order' => 'order_code',
+                    'Internal Reference' => 'internal_reference',
+                    'Item Number' => 'item_number',
+                    'Description' => 'description',
+                    'Description2' => 'description2',
+                    'Quantity Ordered' => 'quantity_ordered',
+                    'Unit of Measure' => 'unit_of_measure',
+                    'PO Cost' => 'po_cost',
+                    'Currency' => 'currency',
+                    'Taxable' => 'taxable',
+                    'Tax Class' => 'tax_class',
+                    'Tax Rate' => 'tax_rate',
+                    'Receipt Date' => 'receipt_date',
+                    'External Reference' => 'external_reference',
+                    'Transaction Date' => 'transaction_date',
+                    'Receipt Quantity' => 'receipt_quantity',
+                    'Receipt_Price' => 'receipt_price', // Corrected header
+                ];
+
+                while (($row = fgetcsv($handle, 1000, ';')) !== false) {
+                    $rowData = [];
+                    foreach ($csvHeaders as $i => $header) {
+                        $header = trim($header);
+                        if (!isset($mapping[$header])) continue;
+                        $key = $mapping[$header];
+                        $value = isset($row[$i]) ? trim($row[$i]) : null;
+                        
+                        // FIX: Convert all strings to UTF-8 to prevent encoding errors
+                        if (is_string($value)) {
+                            $value = mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1');
                         }
-
-                        // Trim all values
-                        $row = array_map('trim', $row);
-
-                        $rowData = array_combine($header, $row);
-
-                        $product->csvRows()->create([
-                            'order' => $rowData['order'] ?? null,
-                            'supplier' => $rowData['supplier'] ?? null,
-                            'internal_reference' => $rowData['internal_reference'] ?? null,
-                            'item_number' => $rowData['item_number'] ?? null,
-                            'description' => $rowData['description'] ?? null,
-                            'description2' => $rowData['description2'] ?? null,
-                            'quantity_ordered' => $rowData['quantity_ordered'] ?? null,
-                            'unit_of_measure' => $rowData['unit_of_measure'] ?? null,
-                            'po_cost' => $rowData['po_cost'] ?? null,
-                            'currency' => $rowData['currency'] ?? null,
-                            'taxable' => isset($rowData['taxable']) ? (bool) $rowData['taxable'] : null,
-                            'tax_class' => $rowData['tax_class'] ?? null,
-                            'tax_rate' => $rowData['tax_rate'] ?? null,
-                            'receipt_date' => $rowData['receipt_date'] ?? null,
-                            'external_reference' => $rowData['external_reference'] ?? null,
-                            'transaction_date' => $rowData['transaction_date'] ?? null,
-                            'receipt_quantity' => $rowData['receipt_quantity'] ?? null,
-                            'receipt_price' => $rowData['receipt_price'] ?? null,
-                        ]);
+                        
+                        $rowData[$key] = $value;
                     }
+
+                    // Apply type conversions and cleaning
+                    $rowData['quantity_ordered'] = (int) $convertNumber($rowData['quantity_ordered'] ?? null);
+                    $rowData['po_cost'] = $convertNumber($rowData['po_cost'] ?? null);
+                    $rowData['tax_rate'] = $convertPercentage($rowData['tax_rate'] ?? null);
+                    $rowData['receipt_quantity'] = (int) $convertNumber($rowData['receipt_quantity'] ?? null);
+                    $rowData['receipt_price'] = $convertNumber($rowData['receipt_price'] ?? null);
+                    $rowData['taxable'] = (strtolower($rowData['taxable'] ?? '') === 'yes');
+
+                    try {
+                        $rowData['receipt_date'] = !empty($rowData['receipt_date']) ? Carbon::createFromFormat('d/m/Y', $rowData['receipt_date'])->format('Y-m-d') : null;
+                    } catch (\Exception $e) {
+                        $rowData['receipt_date'] = null;
+                    }
+                    try {
+                        $rowData['transaction_date'] = !empty($rowData['transaction_date']) ? Carbon::createFromFormat('d/m/Y', $rowData['transaction_date'])->format('Y-m-d') : null;
+                    } catch (\Exception $e) {
+                        $rowData['transaction_date'] = null;
+                    }
+
+                    $product->csvRows()->create($rowData);
                 }
                 fclose($handle);
             }
@@ -127,24 +197,20 @@ class ProductController extends Controller
 
     public function exportSelected(Request $request, Product $product): StreamedResponse
     {
-        $selectedIndexes = $request->input('selected_rows', []);
-        if (empty($selectedIndexes)) {
+        $selectedIds = $request->input('selected_rows', []);
+        if (empty($selectedIds)) {
             return back()->with('error', 'No rows selected for export.');
         }
 
-        // Because in show.blade you are using a custom string as value,
-        // you might need to parse these strings here to match database rows.
-        // But if you want to export based on IDs, the value should be the row ID instead.
-        // Assuming you want to export by IDs, change your blade checkbox value to row id.
-
-        $rowsToExport = $product->csvRows()->whereIn('id', $selectedIndexes)->get()->toArray();
+        $rowsToExport = $product->csvRows()->whereIn('id', $selectedIds)->get()->toArray();
 
         return response()->streamDownload(function () use ($rowsToExport) {
             $handle = fopen('php://output', 'w');
             if (!empty($rowsToExport)) {
-                fputcsv($handle, array_keys($rowsToExport[0]));
+                // Use semicolon as delimiter for consistency with the original file
+                fputcsv($handle, array_keys($rowsToExport[0]), ';');
                 foreach ($rowsToExport as $row) {
-                    fputcsv($handle, $row);
+                    fputcsv($handle, $row, ';');
                 }
             }
             fclose($handle);

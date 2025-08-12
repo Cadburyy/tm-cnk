@@ -8,7 +8,7 @@ class ProductCsvRow extends Model
 {
     protected $fillable = [
         'product_id',
-        'order',
+        'order_code',
         'supplier',
         'internal_reference',
         'item_number',
