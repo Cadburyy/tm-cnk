@@ -3,7 +3,7 @@
 
 @section('content')
 <div class="container">
-    <h1>Product Details</h1>
+    <h1>Data BPB</h1>
 
     {{-- Product basic info --}}
     <div class="card mb-4">
@@ -46,7 +46,7 @@
                                 <th>Order</th>
                                 <th>Supplier</th>
                                 <th>Internal Reference</th>
-                                <th>Receipt Date</th>
+                                <th class="sorted-column">Receipt Date</th>
                                 <th>Item Number</th>
                                 <th>Description</th>
                                 <th>Description 2</th>
