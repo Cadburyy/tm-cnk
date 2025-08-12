@@ -13,70 +13,73 @@
         </div>
     </div>
 
+    {{-- CSV filter form --}}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Filter CSV Data</h5>
+            <form action="{{ route('products.show', $product->id) }}" method="GET">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label for="order_code" class="form-label">Order Code</label>
+                        <input type="text" class="form-control" id="order_code" name="order_code" placeholder="Filter by order code" value="{{ request('order_code') }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Search</button>
+                        <a href="{{ route('products.show', $product->id) }}" class="btn btn-secondary">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     {{-- CSV display and selection --}}
-    @if (!empty($csvData))
-        <form action="{{ route('products.exportSelected', $product->id) }}" method="POST">
-            @csrf
+    @if (request()->filled('order_code'))
+        @if (!empty($csvData))
+            <form action="{{ route('products.exportSelected', $product->id) }}" method="POST">
+                @csrf
 
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Select</th>
-                            <th>Order</th>
-                            <th>Supplier</th>
-                            <th>Internal Reference</th>
-                            <th>Receipt Date</th>
-                            <th>Item Number</th>
-                            <th>Description</th>
-                            <th>Description 2</th>
-                            <th>Quantity Ordered</th>
-                            <th>Receipt Quantity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach ($csvData as $row)
-                        @php
-                            $order = $row['order'] ?? '';
-                            $supplier = $row['supplier'] ?? '';
-                            $internalRef = $row['internal_reference'] ?? '';
-                            $receiptDate = $row['receipt_date'] ?? '';
-                            $itemNumber = $row['item_number'] ?? '';
-                            $description = $row['description'] ?? '';
-                            $description2 = $row['description2'] ?? '';
-                            $quantityOrdered = $row['quantity_ordered'] ?? '';
-                            $receiptQuantity = $row['receipt_quantity'] ?? '';
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Order</th>
+                                <th>Supplier</th>
+                                <th>Internal Reference</th>
+                                <th>Receipt Date</th>
+                                <th>Item Number</th>
+                                <th>Description</th>
+                                <th>Description 2</th>
+                                <th>Quantity Ordered</th>
+                                <th>Receipt Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach ($csvData as $row)
+                            <tr>
+                                <td><input type="checkbox" name="selected_rows[]" value="{{ $row['id'] }}"></td>
+                                <td>{{ $row['order_code'] ?? '' }}</td>
+                                <td>{{ $row['supplier'] ?? '' }}</td>
+                                <td>{{ $row['internal_reference'] ?? '' }}</td>
+                                <td>{{ $row['receipt_date'] ?? '' }}</td>
+                                <td>{{ $row['item_number'] ?? '' }}</td>
+                                <td>{{ $row['description'] ?? '' }}</td>
+                                <td>{{ $row['description2'] ?? '' }}</td>
+                                <td>{{ $row['quantity_ordered'] ?? '' }}</td>
+                                <td>{{ $row['receipt_quantity'] ?? '' }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
-                            $exportString = implode('|', [
-                                $order, $supplier, $internalRef, $receiptDate,
-                                $itemNumber, $description, $description2,
-                                $quantityOrdered, $receiptQuantity
-                            ]);
-                        @endphp
-
-                        <tr>
-                            <td><input type="checkbox" name="selected_rows[]" value="{{ $exportString }}"></td>
-                            <td>{{ $order }}</td>
-                            <td>{{ $supplier }}</td>
-                            <td>{{ $internalRef }}</td>
-                            <td>{{ $receiptDate }}</td>
-                            <td>{{ $itemNumber }}</td>
-                            <td>{{ $description }}</td>
-                            <td>{{ $description2 }}</td>
-                            <td>{{ $quantityOrdered }}</td>
-                            <td>{{ $receiptQuantity }}</td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <button type="submit" class="btn btn-primary mt-3">
-                Export Selected to CSV
-            </button>
-        </form>
-    @else
-        <p>No CSV file uploaded for this product.</p>
+                <button type="submit" class="btn btn-primary mt-3">
+                    Export Selected to CSV
+                </button>
+            </form>
+        @else
+            <p>No CSV data found for the order code '{{ request('order_code') }}'.</p>
+        @endif
     @endif
 
     {{-- Back button --}}
