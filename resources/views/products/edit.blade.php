@@ -40,11 +40,8 @@
     </div>
 
     <div class="form-group mb-2">
-        <strong>Upload CSV File:</strong>
-        <input type="file" name="csv_file" class="form-control">
-        @if($product->csv_file)
-            <small>Current file: {{ $product->csv_file }}</small>
-        @endif
+        <strong>Upload CSV Files:</strong>
+        <input type="file" name="csv_files[]" class="form-control" multiple>
     </div>
 
     <div class="text-center mt-3">

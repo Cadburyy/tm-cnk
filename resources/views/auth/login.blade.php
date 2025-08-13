@@ -3,12 +3,17 @@
 @section('content')
 <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="row w-100 justify-content-center">
-        <div class="col-md-10">
+        <div class="col-md-6 col-lg-5"> {{-- Changed column size to control card width --}}
             <div class="card shadow-lg">
                 <div class="row g-0">
-                    {{-- Left side: Form --}}
-                    <div class="col-md-6 p-4">
-                        <h4 class="mb-4">{{ __('Login') }}</h4>
+                    {{-- Top side: Image --}}
+                    <div class="col-12 d-flex align-items-center justify-content-center bg-light p-4"> {{-- Image now takes full width on top --}}
+                        <img src="{{ asset('images/cnk.png') }}" alt="CNK" class="img-fluid" style="max-height: 250px;">
+                    </div>
+
+                    {{-- Bottom side: Form --}}
+                    <div class="col-12 p-4"> {{-- Form now takes full width on the bottom --}}
+                        <h4 class="mb-4 text-center">{{ __('Login') }}</h4>
 
                         <form method="POST" action="{{ route('login') }}">
                             @csrf
@@ -45,11 +50,6 @@
                                 {{ __('Login') }}
                             </button>
                         </form>
-                    </div>
-
-                    {{-- Right side: Image --}}
-                    <div class="col-md-6 d-flex align-items-center justify-content-center bg-light">
-                        <img src="{{ asset('images/cnk.png') }}" alt="CNK" class="img-fluid" style="max-height: 350px;">
                     </div>
                 </div>
             </div>
