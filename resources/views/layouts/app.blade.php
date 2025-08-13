@@ -15,15 +15,25 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-    {{-- Custom CSS for fixed, blurred navbar --}}
     <style>
         .fixed-blur-navbar {
             position: fixed;
             top: 0;
             width: 100%;
-            z-index: 1030; /* Ensure it's above other content */
-            backdrop-filter: blur(5px); /* Blurring effect */
-            background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white */
+            z-index: 1030;
+            backdrop-filter: blur(5px);
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        #loading-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background-color: #3498db;
+            transition: width 0.3s ease-in-out, opacity 0.5s ease-in-out;
+            z-index: 1031;
         }
     </style>
 </head>
@@ -57,13 +67,11 @@
                                 $isSupplierOnly = in_array('Supplier', $roleNames) && !$isAdmin;
                             @endphp
 
-                            {{-- Admin sees all --}}
                             @if($isAdmin)
                                 <li><a class="nav-link" href="{{ route('users.index') }}">Manage Users</a></li>
                                 <li><a class="nav-link" href="{{ route('roles.index') }}">Manage Role</a></li>
                                 <li><a class="nav-link" href="{{ route('products.index') }}">Manage Product</a></li>
                             @elseif($isSupplierOnly)
-                                {{-- Supplier sees only Manage Product --}}
                                 <li><a class="nav-link" href="{{ route('products.index') }}">Manage Product</a></li>
                             @endif
 
@@ -89,9 +97,10 @@
                     </ul>
                 </div>
             </div>
+            <div id="loading-bar"></div>
         </nav>
 
-        <main class="py-4 mt-5"> {{-- Add mt-5 to prevent content from being hidden behind the fixed navbar --}}
+        <main class="py-4 mt-5">
             <div class="container">
                 <div class="row justify-content-center">
                     <div class="col-md-12">
@@ -105,5 +114,18 @@
             </div>
         </main>
     </div>
+
+    <script>
+        const loadingBar = document.getElementById('loading-bar');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadingBar.style.width = '90%';
+        });
+
+        window.addEventListener('load', function() {
+            loadingBar.style.width = '100%';
+            loadingBar.style.opacity = '0';
+        });
+    </script>
 </body>
 </html>
