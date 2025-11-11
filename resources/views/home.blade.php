@@ -62,11 +62,11 @@
             {{-- Card for 'Manage Products' (visible to both Admin and Supplier) --}}
             @if($isAdmin || $isSupplierOnly)
             <div class="col-md-4">
-                <a href="{{ route('products.index') }}" class="text-decoration-none card-link-hover">
+                <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
                     <div class="card h-100 text-center border-0 shadow-sm p-4">
                         <div class="card-body d-flex flex-column justify-content-center align-items-center">
                             <i class="fas fa-box-open fa-3x mb-3 text-info"></i>
-                            <h5 class="card-title">Manage Products</h5>
+                            <h5 class="card-title">Manage Items</h5>
                             <p class="card-text text-muted">Manage and track product requests.</p>
                         </div>
                     </div>
