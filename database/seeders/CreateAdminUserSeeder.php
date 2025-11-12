@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class CreateAdminUserSeeder extends Seeder
 {
@@ -15,15 +16,17 @@ class CreateAdminUserSeeder extends Seeder
     public function run(): void
     {
         $user = User::create([
-            'name' => 'AdminIT',
-            'email' => 'adminit@gmail.com',
-            'password' => bcrypt('adminit')
+            'name' => 'Admin', 
+            'email' => 'admin@gmail.com',
+            'password' => bcrypt('admin')
         ]);
 
-        $role = Role::where('name', 'Admin')->first();
+        $role = Role::create(['name' => 'Admin']);
 
-        if ($role) {
-            $user->assignRole([$role->id]);
-        }
+        $permissions = Permission::pluck('id','id')->all();
+
+        $role->syncPermissions($permissions);
+
+        $user->assignRole([$role->id]);
     }
 }
