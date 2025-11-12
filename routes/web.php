@@ -22,11 +22,13 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::middleware(['auth'])->group(function () {
     Route::resource('roles', RoleController::class);
     Route::resource('users', UserController::class);
+    Route::resource('items', ItemController::class);
+    Route::resource('budget', ItemController::class);  
 
     Route::get('/items/export-resume-detail', [ItemController::class, 'exportResumeDetail'])->name('items.exportResumeDetail');
     Route::post('/items/export-selected', [ItemController::class, 'exportSelected'])->name('items.exportSelected');
 
-    Route::resource('items', ItemController::class); 
+    
 });
 
 Route::middleware(['auth', 'role:Admin'])->group(function () {

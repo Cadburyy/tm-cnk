@@ -12,6 +12,7 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
+        // --- 1. Logika Ajax untuk Detail Pivot Row ---
         if ($request->ajax() && $request->get('action') === 'pivot_row_details') {
             $id_list = $request->get('id_list');
             if (empty($id_list)) {
@@ -42,6 +43,37 @@ class ItemController extends Controller
                 'details' => $details,
             ]);
         }
+        
+        // --- 2. Ambil Data untuk Datalist & Filter (Fix: Undefined Variables) ---
+        
+        // Mengambil data untuk Item Number Datalist
+        $itemNumbers = DB::table('items')
+            ->select('item_number')
+            ->distinct()
+            ->whereNotNull('item_number')
+            ->where('item_number', '!=', '')
+            ->orderBy('item_number')
+            ->pluck('item_number');
+
+        // Mengambil data untuk Item Group Datalist
+        $itemGroups = DB::table('items')
+            ->select('item_group')
+            ->distinct()
+            ->whereNotNull('item_group')
+            ->where('item_group', '!=', '')
+            ->orderBy('item_group')
+            ->pluck('item_group');
+            
+        // Mengambil data untuk DEPT Datalist
+        $depts = DB::table('items')
+            ->select('dept')
+            ->distinct()
+            ->whereNotNull('dept')
+            ->where('dept', '!=', '')
+            ->orderBy('dept')
+            ->pluck('dept');
+
+        // --- 3. Logika Filter dan Data Utama (Sama seperti sebelumnya) ---
 
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
@@ -193,7 +225,14 @@ class ItemController extends Controller
             }
         }
 
+        // --- 4. Mengembalikan View dengan semua data yang dibutuhkan ---
         return view('items.index', [
+            // Variabel Datalist BARU
+            'itemNumbers' => $itemNumbers,
+            'itemGroups' => $itemGroups,
+            'depts' => $depts,
+
+            // Variabel Utama lainnya (Sama seperti sebelumnya)
             'items' => $items,
             'start_date' => $start_date,
             'end_date' => $end_date,
@@ -209,9 +248,12 @@ class ItemController extends Controller
             'months' => array_values($months),
         ]);
     }
-
+    
+    // ... method store, exportSelected, dan exportResumeDetail lainnya tetap sama
+    
     public function store(Request $request)
     {
+        // ... (kode store tetap sama)
         $request->validate([
             'csv_files' => 'required|array',
             'csv_files.*' => 'mimes:csv,txt|max:10240',
@@ -298,6 +340,7 @@ class ItemController extends Controller
 
     public function exportSelected(Request $request)
     {
+        // ... (kode exportSelected tetap sama)
         $mode = $request->input('mode', 'details');
         $selected = (array) $request->input('selected_ids', []);
         $pivot_months = (array) $request->input('pivot_months', []);
@@ -451,6 +494,7 @@ class ItemController extends Controller
 
     public function exportResumeDetail(Request $request)
     {
+        // ... (kode exportResumeDetail tetap sama)
         $idLists = $request->input('id_lists');
         $monthsParam = $request->input('months');
 

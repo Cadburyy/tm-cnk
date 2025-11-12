@@ -4,80 +4,80 @@
 @php
     // Get the authenticated user and their roles at the very top of the content section
     $user = Auth::user();
+    // Assuming $user->roles is a collection or an array access property
     $roleNames = $user ? $user->roles->pluck('name')->toArray() : [];
     $isAdmin = in_array('Admin', $roleNames);
     $istestOnly = in_array('test', $roleNames) && !$isAdmin;
 @endphp
+
 <style>
     body, html {
-        overflow: hidden; /* Hide any scrollbars */
+        overflow-x: hidden;
+        overflow-y: auto;
     }
+
     .card-link-hover:hover .card {
-        background-color: #FFFFFF; /* A brighter, lighter blue on hover */
-        border-color: #e9ecef !important;
-        transform: translateY(-5px); /* Lift card slightly */
-        transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+        transform: translateY(-5px);
+        /* Increased shadow for better visibility on hover */
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important; 
+        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
     }
+
     .card-link-hover .card {
-        transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    }
+
+    .card {
+        border-radius: 1rem;
+        /* Using a light grey fallback for --border */
+        border: 1px solid #e9ecef; 
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075)!important;
+    }
+
+    .text-primary-dark {
+        color: #0056b3;
     }
 </style>
 
-<div class="d-flex flex-column justify-content-center align-items-center vh-100">
-    <div class="container py-4">
-        <h2 class="text-center mb-4">Welcome, {{ $user->name }}</h2>
+<div class="container d-flex flex-column justify-content-center py-5" style="min-height: 80vh;">
+    <h2 class="text-center mb-5">Welcome, {{ $user->name }}</h2>
+    
+    {{-- Main Feature Cards (Limited to 2) --}}
+    <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mt-3">
+
+        {{-- Card for 'Manage Items' --}}
+        <div class="col-md-4">
+            <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
+                <div class="card h-100 text-center shadow-sm p-3">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                        <i class="fas fa-box-open fa-3x mb-2 text-info"></i>
+                        <h5 class="card-title"><strong>Manage Items</strong></h5>
+                        <p class="card-text text-muted"><strong>Manage and track product requests.</strong></p>
+                    </div>
+                </div>
+            </a>
+        </div>
         
-        <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mt-4">
-
-            {{-- Card for 'Manage Users' --}}
-            @if($isAdmin)
-            <div class="col-md-4">
-                <a href="{{ route('users.index') }}" class="text-decoration-none card-link-hover">
-                    <div class="card h-100 text-center border-0 shadow-sm p-4">
-                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
-                            <i class="fas fa-users fa-3x mb-3 text-primary"></i>
-                            <h5 class="card-title">Manage Users</h5>
-                            <p class="card-text text-muted">View and manage all user accounts.</p>
-                        </div>
+        {{-- Card for 'Manage Budget' --}}
+        <div class="col-md-4">
+            <a href="{{ route('budget.index') }}" class="text-decoration-none card-link-hover">
+                <div class="card h-100 text-center shadow-sm p-3">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                        <i class="fas fa-dollar-sign fa-3x mb-2 text-success"></i>
+                        <h5 class="card-title"><strong>Manage Budget</strong></h5>
+                        <p class="card-text text-muted"><strong>View and allocate financial resources.</strong></p>
                     </div>
-                </a>
-            </div>
-            @endif
-
-            {{-- Card for 'Manage Roles' --}}
-            @if($isAdmin)
-            <div class="col-md-4">
-                <a href="{{ route('roles.index') }}" class="text-decoration-none card-link-hover">
-                    <div class="card h-100 text-center border-0 shadow-sm p-4">
-                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
-                            <i class="fas fa-user-tag fa-3x mb-3 text-success"></i>
-                            <h5 class="card-title">Manage Roles</h5>
-                            <p class="card-text text-muted">Assign and modify user roles and permissions.</p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            @endif
-            
-            <div class="col-md-4">
-                <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
-                    <div class="card h-100 text-center border-0 shadow-sm p-4">
-                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
-                            <i class="fas fa-box-open fa-3x mb-3 text-info"></i>
-                            <h5 class="card-title">Manage Items</h5>
-                            <p class="card-text text-muted">Manage and track product requests.</p>
-                        </div>
-                    </div>
-                </a>
-            </div>
+                </div>
+            </a>
         </div>
 
-        {{-- Display logged-in status message below the cards --}}
-        @if (session('status'))
-            <div class="alert alert-success text-center mt-5" role="alert">
-                {{ session('status') }}
-            </div>
-        @endif
     </div>
+
+    {{-- Display logged-in status message below the cards --}}
+    @if (session('status'))
+        <div class="alert alert-success text-center mt-5" role="alert">
+            {{ session('status') }}
+        </div>
+    @endif
 </div>
 @endsection
