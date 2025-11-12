@@ -6,9 +6,6 @@ use App\Models\Item;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Session;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ItemController extends Controller
@@ -17,17 +14,12 @@ class ItemController extends Controller
     {
         if ($request->ajax() && $request->get('action') === 'pivot_row_details') {
             $id_list = $request->get('id_list');
-            $item_key = $request->get('item_key');
             if (empty($id_list)) {
-                return response()->json([
-                    'details' => [],
-                ]);
+                return response()->json(['details' => []]);
             }
             $ids = array_filter(array_map('trim', explode(',', $id_list)));
             if (empty($ids)) {
-                return response()->json([
-                    'details' => [],
-                ]);
+                return response()->json(['details' => []]);
             }
             $details = Item::whereIn('id', $ids)
                 ->orderBy('effective_date', 'asc')
@@ -60,7 +52,6 @@ class ItemController extends Controller
         }
         $item_number_term = $request->input('item_number_term');
         $item_description_term = $request->input('item_description_term');
-        $remarks_term = $request->input('remarks_term');
         $item_group_term = $request->input('item_group_term');
         $dept_term = $request->input('dept_term');
 
@@ -82,24 +73,24 @@ class ItemController extends Controller
             $query->whereBetween('effective_date', [$start_date, $end_date]);
         }
 
-        $selected_ym_periods = [];
-        $selected_avg_years = [];
+        $selected_months = [];
+        $selected_yearly = [];
 
         if ($mode == 'resume') {
             $raw_selections = array_filter((array)$raw_selections);
             foreach ($raw_selections as $selection) {
-                if (str_contains($selection, 'AVG-')) {
-                    $selected_avg_years[] = str_replace('AVG-', '', $selection);
+                if (str_starts_with($selection, 'YEARLY-')) {
+                    $selected_yearly[] = str_replace('YEARLY-', '', $selection);
                 } else {
-                    $selected_ym_periods[] = $selection;
+                    $selected_months[] = $selection;
                 }
             }
-            if (!empty($selected_ym_periods) || !empty($selected_avg_years)) {
-                $query->where(function($q) use ($selected_ym_periods, $selected_avg_years) {
-                    foreach ($selected_ym_periods as $ym) {
+            if (!empty($selected_months) || !empty($selected_yearly)) {
+                $query->where(function($q) use ($selected_months, $selected_yearly) {
+                    foreach ($selected_months as $ym) {
                         $q->orWhere('effective_date', 'LIKE', $ym . '-%');
                     }
-                    foreach ($selected_avg_years as $year) {
+                    foreach ($selected_yearly as $year) {
                         $q->orWhereYear('effective_date', $year);
                     }
                 });
@@ -111,9 +102,6 @@ class ItemController extends Controller
         }
         if ($item_description_term) {
             $query->where('item_description', 'LIKE', '%' . $item_description_term . '%');
-        }
-        if ($remarks_term) {
-            $query->where('remarks', 'LIKE', '%' . $remarks_term . '%');
         }
         if ($item_group_term) {
             $query->where('item_group', 'LIKE', '%' . $item_group_term . '%');
@@ -129,15 +117,23 @@ class ItemController extends Controller
 
         if ($mode == 'resume') {
             $final_months = [];
-            foreach ($selected_avg_years as $year) {
-                $key = "AVG-{$year}";
-                $final_months[$key] = ['key' => $key, 'label' => "Avg " . substr($year, 2, 2), 'type' => 'avg'];
+            foreach ($selected_yearly as $yearEntry) {
+                $parts = explode('|', $yearEntry);
+                $year = $parts[0];
+                $type = $parts[1] ?? 'total';
+                if ($type === 'avg') {
+                    $key = "YEARLY-{$year}|avg";
+                    $final_months[$key] = ['key' => $key, 'label' => "Avg " . substr($year, 2, 2), 'type' => 'yearly_avg', 'year' => $year];
+                } else {
+                    $key = "YEARLY-{$year}|total";
+                    $final_months[$key] = ['key' => $key, 'label' => "Total " . $year, 'type' => 'yearly_total', 'year' => $year];
+                }
             }
             $temp_months = [];
-            foreach ($selected_ym_periods as $ym) {
+            foreach ($selected_months as $ym) {
                 try {
                     $date = Carbon::createFromFormat('Y-m', $ym);
-                    $temp_months[$ym] = ['key' => $ym, 'label' => $date->format('M y'), 'type' => 'month'];
+                    $temp_months[$ym] = ['key' => $ym, 'label' => $date->format('M y'), 'type' => 'month', 'year' => $date->format('Y')];
                 } catch (\Exception $e) {
                     continue;
                 }
@@ -150,6 +146,7 @@ class ItemController extends Controller
                 $key = $item->item_number . '||' . $item->item_description . '||' . $item->unit_of_measure . '||' . $item->dept;
                 $qty = $item->loc_qty_change;
                 $item_id = $item->id;
+                $remarks = trim((string)$item->remarks);
                 if (!isset($summary_rows[$key])) {
                     $summary_rows[$key] = [
                         'item_number' => $item->item_number,
@@ -161,6 +158,7 @@ class ItemController extends Controller
                         'row_ids' => [],
                         'annual_totals' => [],
                         'annual_months_count' => [],
+                        'remarks_set' => [],
                     ];
                 }
                 $summary_rows[$key]['months'][$month_year] = ($summary_rows[$key]['months'][$month_year] ?? 0) + $qty;
@@ -168,17 +166,30 @@ class ItemController extends Controller
                 $summary_rows[$key]['annual_totals'][$year] = ($summary_rows[$key]['annual_totals'][$year] ?? 0) + $qty;
                 $summary_rows[$key]['annual_months_count'][$year][$month_year] = true;
                 $summary_rows[$key]['row_ids'][] = $item_id;
+                if ($remarks !== '') {
+                    $summary_rows[$key]['remarks_set'][$remarks] = true;
+                }
             }
             foreach ($summary_rows as $key => $row) {
-                foreach ($selected_avg_years as $year) {
+                foreach ($selected_yearly as $yearEntry) {
+                    $parts = explode('|', $yearEntry);
+                    $year = $parts[0];
+                    $type = $parts[1] ?? 'total';
                     $annual_total = $row['annual_totals'][$year] ?? 0;
-                    $unique_months_in_data = count($row['annual_months_count'][$year] ?? []);
-                    $avg_key = "AVG-{$year}";
-                    $summary_rows[$key]['months'][$avg_key] = ($unique_months_in_data > 0) ? ($annual_total / $unique_months_in_data) : 0;
+                    if ($type === 'avg') {
+                        $unique_months_in_data = count($row['annual_months_count'][$year] ?? []);
+                        $yearly_key = "YEARLY-{$year}|avg";
+                        $summary_rows[$key]['months'][$yearly_key] = ($unique_months_in_data > 0) ? ($annual_total / $unique_months_in_data) : 0;
+                    } else {
+                        $yearly_key = "YEARLY-{$year}|total";
+                        $summary_rows[$key]['months'][$yearly_key] = $annual_total;
+                    }
                 }
                 $summary_rows[$key]['row_ids'] = implode(',', array_unique($summary_rows[$key]['row_ids']));
+                $summary_rows[$key]['remarks'] = implode(' | ', array_keys($summary_rows[$key]['remarks_set'] ?? []));
                 unset($summary_rows[$key]['annual_totals']);
                 unset($summary_rows[$key]['annual_months_count']);
+                unset($summary_rows[$key]['remarks_set']);
             }
         }
 
@@ -189,7 +200,6 @@ class ItemController extends Controller
             'pivot_months' => $raw_selections,
             'item_number_term' => $item_number_term,
             'item_description_term' => $item_description_term,
-            'remarks_term' => $remarks_term,
             'item_group_term' => $item_group_term,
             'dept_term' => $dept_term,
             'distinctYears' => $distinctYears,
@@ -282,162 +292,226 @@ class ItemController extends Controller
             return redirect()->route('items.index')->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("CSV Upload Error: " . $e->getMessage());
             return redirect()->route('items.index')->with('error', 'Data upload failed: ' . $e->getMessage());
         }
     }
 
     public function exportSelected(Request $request)
-{
-    $mode = $request->input('mode', 'details');
-    $selected = (array) $request->input('selected_ids', []);
-    $months = (array) $request->input('months', []);
+    {
+        $mode = $request->input('mode', 'details');
+        $selected = (array) $request->input('selected_ids', []);
+        $pivot_months = (array) $request->input('pivot_months', []);
 
-    if (empty($selected)) {
-        return back()->with('error', 'No rows selected for export.');
+        if (empty($selected)) {
+            return back()->with('error', 'No rows selected for export.');
+        }
+
+        try {
+            ini_set('memory_limit', '512M');
+            set_time_limit(300);
+
+            if ($mode === 'details') {
+                $ids = array_filter($selected);
+                $items = Item::whereIn('id', $ids)->orderBy('effective_date', 'asc')->get();
+                $filename = 'items_details_' . now()->format('Ymd_His') . '.csv';
+                $response = new StreamedResponse(function() use ($items) {
+                    $out = fopen('php://output', 'w');
+                    fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
+                    foreach ($items as $it) {
+                        try {
+                            $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
+                        } catch (\Exception $e) {
+                            $effective = $it->effective_date;
+                        }
+                        fputcsv($out, [
+                            $it->item_number,
+                            $it->item_description,
+                            $effective,
+                            $it->bulan,
+                            $it->loc_qty_change,
+                            $it->unit_of_measure,
+                            $it->remarks,
+                            $it->item_group,
+                            $it->dept,
+                        ]);
+                    }
+                    fclose($out);
+                });
+                $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+                $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+                return $response;
+            }
+
+            if ($mode === 'resume') {
+                $rows = [];
+                foreach ($selected as $row_ids_str) {
+                    if (trim($row_ids_str) === '') continue;
+                    $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
+                    if (empty($ids)) continue;
+                    $items = Item::whereIn('id', $ids)->get();
+                    if ($items->isEmpty()) continue;
+                    $first = $items->first();
+                    $rowData = [
+                        'item_number' => $first->item_number,
+                        'item_description' => $first->item_description,
+                        'unit_of_measure' => $first->unit_of_measure,
+                        'dept' => $first->dept,
+                    ];
+                    $remarksSet = [];
+                    $total = 0;
+                    
+                    // Only process selected pivot months
+                    foreach ($pivot_months as $mkey) {
+                        if (str_starts_with($mkey, 'YEARLY-')) {
+                            $parts = explode('|', str_replace('YEARLY-', '', $mkey));
+                            $year = $parts[0];
+                            $type = $parts[1] ?? 'total';
+                            $yearItems = $items->filter(function($it) use ($year) {
+                                return Carbon::parse($it->effective_date)->format('Y') === $year;
+                            });
+                            $annual_totals = $yearItems->sum('loc_qty_change');
+                            if ($type === 'avg') {
+                                $distinct_months = $yearItems->groupBy(function($it) {
+                                    return Carbon::parse($it->effective_date)->format('Y-m');
+                                })->count();
+                                $val = $distinct_months ? ($annual_totals / $distinct_months) : 0;
+                            } else {
+                                $val = $annual_totals;
+                            }
+                            $rowData[$mkey] = $val;
+                        } else {
+                            $val = $items->filter(function($it) use ($mkey) {
+                                return Carbon::parse($it->effective_date)->format('Y-m') === $mkey;
+                            })->sum('loc_qty_change');
+                            $rowData[$mkey] = $val;
+                            $total += $val;
+                        }
+                        foreach ($items as $it) {
+                            $r = trim((string)$it->remarks);
+                            if ($r !== '') $remarksSet[$r] = true;
+                        }
+                    }
+                    $rowData['total'] = $total;
+                    $rowData['remarks'] = implode(' | ', array_keys($remarksSet));
+                    $rows[] = $rowData;
+                }
+                
+                $filename = 'items_resume_' . now()->format('Ymd_His') . '.csv';
+                $response = new StreamedResponse(function() use ($rows, $pivot_months) {
+                    $out = fopen('php://output', 'w');
+                    $header = ['Item Number','Item Description','UOM'];
+                    foreach ($pivot_months as $m) {
+                        // Format header label
+                        if (str_starts_with($m, 'YEARLY-')) {
+                            $parts = explode('|', str_replace('YEARLY-', '', $m));
+                            $year = $parts[0];
+                            $type = $parts[1] ?? 'total';
+                            $label = ($type === 'avg') ? "Avg $year" : "Total $year";
+                            $header[] = $label;
+                        } else {
+                            try {
+                                $date = Carbon::createFromFormat('Y-m', $m);
+                                $header[] = $date->format('M y');
+                            } catch (\Exception $e) {
+                                $header[] = $m;
+                            }
+                        }
+                    }
+                    $header[] = 'Total Qty';
+                    $header[] = 'Remarks';
+                    $header[] = 'DEPT';
+                    fputcsv($out, $header);
+                    
+                    foreach ($rows as $r) {
+                        $line = [$r['item_number'] ?? '', $r['item_description'] ?? '', $r['unit_of_measure'] ?? ''];
+                        foreach ($pivot_months as $m) {
+                            $line[] = $r[$m] ?? 0;
+                        }
+                        $line[] = $r['total'] ?? 0;
+                        $line[] = $r['remarks'] ?? '';
+                        $line[] = $r['dept'] ?? '';
+                        fputcsv($out, $line);
+                    }
+                    fclose($out);
+                });
+                $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+                $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+                return $response;
+            }
+
+            return back()->with('error', 'Invalid export mode.');
+        } catch (\Throwable $e) {
+            \Log::error('ExportSelected error: ' . $e->getMessage(), ['exception' => $e]);
+            if ($request->ajax()) {
+                return response()->json(['error' => 'Export failed. Check logs.'], 500);
+            }
+            return back()->with('error', 'Export failed. Check logs.');
+        }
     }
 
-    try {
-        ini_set('memory_limit', '512M');
-        set_time_limit(300);
+    public function exportResumeDetail(Request $request)
+    {
+        $idLists = $request->input('id_lists');
+        $monthsParam = $request->input('months');
 
-        if ($mode === 'details') {
-            $ids = array_filter($selected);
-            $items = Item::whereIn('id', $ids)->orderBy('effective_date', 'asc')->get();
-            $filename = 'items_details_' . now()->format('Ymd_His') . '.xlsx';
-            $response = new StreamedResponse(function() use ($items) {
-                $spreadsheet = new Spreadsheet();
-                $sheet = $spreadsheet->getActiveSheet();
-                $headers = ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT'];
-                $col = 1;
-                foreach ($headers as $h) {
-                    $sheet->setCellValueByColumnAndRow($col, 1, $h);
-                    $col++;
-                }
-                $rowNum = 2;
+        if (!$idLists) {
+            return back()->with('error', 'Invalid export request');
+        }
+
+        $allIdLists = explode('||', $idLists);
+        $allIds = [];
+        foreach ($allIdLists as $list) {
+            $ids = array_filter(array_map('trim', explode(',', $list)));
+            $allIds = array_merge($allIds, $ids);
+        }
+
+        $allIds = array_unique($allIds);
+        if (empty($allIds)) {
+            return back()->with('error', 'No items to export');
+        }
+
+        $items = Item::whereIn('id', $allIds)->orderBy('effective_date', 'asc')->get();
+        if ($items->isEmpty()) {
+            return back()->with('error', 'No data found');
+        }
+
+        $months = !empty($monthsParam) ? explode(',', $monthsParam) : [];
+
+        try {
+            ini_set('memory_limit', '512M');
+            set_time_limit(300);
+
+            $filename = 'bulk_detail_transaksi_' . now()->format('Ymd_His') . '.csv';
+            $response = new StreamedResponse(function() use ($items, $months) {
+                $out = fopen('php://output', 'w');
+                fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
                 foreach ($items as $it) {
                     try {
                         $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
                     } catch (\Exception $e) {
                         $effective = $it->effective_date;
                     }
-                    $sheet->setCellValueByColumnAndRow(1, $rowNum, $it->item_number);
-                    $sheet->setCellValueByColumnAndRow(2, $rowNum, $it->item_description);
-                    $sheet->setCellValueByColumnAndRow(3, $rowNum, $effective);
-                    $sheet->setCellValueByColumnAndRow(4, $rowNum, $it->bulan);
-                    $sheet->setCellValueByColumnAndRow(5, $rowNum, $it->loc_qty_change);
-                    $sheet->setCellValueByColumnAndRow(6, $rowNum, $it->unit_of_measure);
-                    $sheet->setCellValueByColumnAndRow(7, $rowNum, $it->remarks);
-                    $sheet->setCellValueByColumnAndRow(8, $rowNum, $it->item_group);
-                    $sheet->setCellValueByColumnAndRow(9, $rowNum, $it->dept);
-                    $rowNum++;
+                    fputcsv($out, [
+                        $it->item_number,
+                        $it->item_description,
+                        $effective,
+                        $it->bulan,
+                        intval($it->loc_qty_change),
+                        $it->unit_of_measure,
+                        $it->remarks,
+                        $it->item_group,
+                        $it->dept,
+                    ]);
                 }
-                $writer = new Xlsx($spreadsheet);
-                if (ob_get_level()) {
-                    while (ob_get_level()) { ob_end_clean(); }
-                }
-                $writer->save('php://output');
+                fclose($out);
             });
-            $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+            $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
             $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
             return $response;
+        } catch (\Throwable $e) {
+            \Log::error('ExportResumeDetail error: ' . $e->getMessage(), ['exception' => $e]);
+            return back()->with('error', 'Export failed. Check logs.');
         }
-
-        if ($mode === 'resume') {
-            $rows = [];
-            foreach ($selected as $row_ids_str) {
-                if (trim($row_ids_str) === '') continue;
-                $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
-                if (empty($ids)) continue;
-                $items = Item::whereIn('id', $ids)->get();
-                if ($items->isEmpty()) continue;
-                $first = $items->first();
-                $rowData = [
-                    'item_number' => $first->item_number,
-                    'item_description' => $first->item_description,
-                    'unit_of_measure' => $first->unit_of_measure,
-                    'dept' => $first->dept,
-                ];
-                $total = 0;
-                foreach ($months as $mkey) {
-                    if (str_starts_with($mkey, 'AVG-')) {
-                        $year = substr($mkey, 4);
-                        $yearItems = $items->filter(function($it) use ($year) {
-                            return Carbon::parse($it->effective_date)->format('Y') === $year;
-                        });
-                        $annual_totals = $yearItems->sum('loc_qty_change');
-                        $distinct_months = $yearItems->groupBy(function($it) {
-                            return Carbon::parse($it->effective_date)->format('Y-m');
-                        })->count();
-                        $val = $distinct_months ? ($annual_totals / $distinct_months) : 0;
-                    } else {
-                        $val = $items->filter(function($it) use ($mkey) {
-                            return Carbon::parse($it->effective_date)->format('Y-m') === $mkey;
-                        })->sum('loc_qty_change');
-                    }
-                    $rowData[$mkey] = $val;
-                    $total += $val;
-                }
-                $rowData['total'] = $total;
-                $rows[] = $rowData;
-            }
-            $filename = 'items_resume_' . now()->format('Ymd_His') . '.xlsx';
-            $response = new StreamedResponse(function() use ($rows, $months) {
-                $spreadsheet = new Spreadsheet();
-                $sheet = $spreadsheet->getActiveSheet();
-                $header = ['Item Number','Item Description','UOM'];
-                foreach ($months as $m) {
-                    if (str_starts_with($m, 'AVG-')) {
-                        $year = substr($m, 4);
-                        $label = 'Avg ' . substr($year, 2, 2);
-                    } else {
-                        try {
-                            $label = Carbon::createFromFormat('Y-m', $m)->format('M y');
-                        } catch (\Exception $e) {
-                            $label = $m;
-                        }
-                    }
-                    $header[] = $label;
-                }
-                $header[] = 'Total Qty';
-                $header[] = 'DEPT';
-                $col = 1;
-                foreach ($header as $h) {
-                    $sheet->setCellValueByColumnAndRow($col, 1, $h);
-                    $col++;
-                }
-                $rowNum = 2;
-                foreach ($rows as $r) {
-                    $sheet->setCellValueByColumnAndRow(1, $rowNum, $r['item_number'] ?? '');
-                    $sheet->setCellValueByColumnAndRow(2, $rowNum, $r['item_description'] ?? '');
-                    $sheet->setCellValueByColumnAndRow(3, $rowNum, $r['unit_of_measure'] ?? '');
-                    $col = 4;
-                    foreach ($months as $m) {
-                        $sheet->setCellValueByColumnAndRow($col, $rowNum, $r[$m] ?? 0);
-                        $col++;
-                    }
-                    $sheet->setCellValueByColumnAndRow($col++, $rowNum, $r['total'] ?? 0);
-                    $sheet->setCellValueByColumnAndRow($col, $rowNum, $r['dept'] ?? '');
-                    $rowNum++;
-                }
-                $writer = new Xlsx($spreadsheet);
-                if (ob_get_level()) {
-                    while (ob_get_level()) { ob_end_clean(); }
-                }
-                $writer->save('php://output');
-            });
-            $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-            return $response;
-        }
-
-        return back()->with('error', 'Invalid export mode.');
-    } catch (\Throwable $e) {
-        \Log::error('ExportSelected error: ' . $e->getMessage(), ['exception' => $e]);
-        if ($request->ajax()) {
-            return response()->json(['error' => 'Export failed. Check logs.'], 500);
-        }
-        return back()->with('error', 'Export failed. Check logs.');
     }
-}
 }

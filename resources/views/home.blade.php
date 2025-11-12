@@ -6,7 +6,7 @@
     $user = Auth::user();
     $roleNames = $user ? $user->roles->pluck('name')->toArray() : [];
     $isAdmin = in_array('Admin', $roleNames);
-    $isSupplierOnly = in_array('Supplier', $roleNames) && !$isAdmin;
+    $istestOnly = in_array('test', $roleNames) && !$isAdmin;
 @endphp
 <style>
     body, html {
@@ -59,8 +59,6 @@
             </div>
             @endif
             
-            {{-- Card for 'Manage Products' (visible to both Admin and Supplier) --}}
-            @if($isAdmin || $isSupplierOnly)
             <div class="col-md-4">
                 <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
                     <div class="card h-100 text-center border-0 shadow-sm p-4">
@@ -72,8 +70,6 @@
                     </div>
                 </a>
             </div>
-            @endif
-
         </div>
 
         {{-- Display logged-in status message below the cards --}}

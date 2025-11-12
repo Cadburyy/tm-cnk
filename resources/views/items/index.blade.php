@@ -18,7 +18,7 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
-    <form method="GET" action="{{ route('items.index') }}" class="row mb-4">
+    <form method="GET" action="{{ route('items.index') }}" class="row mb-4" id="filterForm">
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header bg-light fw-bold">Pilihan Filter Data</div>
@@ -35,124 +35,175 @@
                             </div>
                             <div class="col-lg-2 col-md-4">
                                 <label class="form-label">Item Number</label>
-                                <input type="text" name="item_number_term" value="{{ $item_number_term }}" class="form-control form-control-sm" placeholder="Cari Item No">
+                                @php
+                                    $itemNumbers = DB::table('items')->select('item_number')->distinct()->whereNotNull('item_number')->where('item_number', '!=', '')->orderBy('item_number')->pluck('item_number');
+                                @endphp
+                                <select name="item_number_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih Item Number --</option>
+                                    @foreach($itemNumbers as $num)
+                                        <option value="{{ $num }}" @selected($item_number_term === $num)>{{ $num }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="col-lg-2 col-md-4">
                                 <label class="form-label">Item Group</label>
-                                <input type="text" name="item_group_term" value="{{ $item_group_term }}" class="form-control form-control-sm" placeholder="Cari Grup">
+                                <select name="item_group_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih Item Group --</option>
+                                    @php
+                                        $itemGroups = DB::table('items')->select('item_group')->distinct()->whereNotNull('item_group')->where('item_group', '!=', '')->orderBy('item_group')->pluck('item_group');
+                                    @endphp
+                                    @foreach($itemGroups as $group)
+                                        <option value="{{ $group }}" @selected($item_group_term === $group)>{{ $group }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="col-lg-2 col-md-4">
                                 <label class="form-label">DEPT</label>
-                                <input type="text" name="dept_term" value="{{ $dept_term }}" class="form-control form-control-sm" placeholder="Cari DEPT">
-                            </div>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-lg-6">
-                                <label class="form-label">Item Description</label>
-                                <input type="text" name="item_description_term" value="{{ $item_description_term }}" class="form-control form-control-sm" placeholder="Cari Deskripsi">
-                            </div>
-                            <div class="col-lg-6">
-                                <label class="form-label">Remarks</label>
-                                <input type="text" name="remarks_term" value="{{ $remarks_term }}" class="form-control form-control-sm" placeholder="Cari Remarks">
+                                <select name="dept_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih DEPT --</option>
+                                    @php
+                                        $depts = DB::table('items')->select('dept')->distinct()->whereNotNull('dept')->where('dept', '!=', '')->orderBy('dept')->pluck('dept');
+                                    @endphp
+                                    @foreach($depts as $dept)
+                                        <option value="{{ $dept }}" @selected($dept_term === $dept)>{{ $dept }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                     @else
                         <div class="row g-3">
                             <div class="col-lg-6 col-md-12">
-                                <label class="form-label fw-bold">Pilih Bulan & Tahun untuk Pivot Table</label>
-                                <div class="dropdown">
-                                    <button class="btn btn-outline-info dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-calendar-alt me-2"></i>
-                                        {{ count($pivot_months) > 0 ? count($pivot_months) . ' Bulan/Tahun terpilih' : 'Pilih Bulan/Tahun...' }}
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-start p-3" style="max-height: 400px; overflow-y: auto;">
-                                        @forelse($distinctYears as $year)
-                                            <li>
-                                                <div class="dropdown-header fw-bold border-bottom mb-1">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="pivot_months[]" id="avg_{{ $year }}" value="AVG-{{ $year }}" @checked(in_array('AVG-' . $year, $pivot_months))>
-                                                        <label class="form-check-label text-primary" for="avg_{{ $year }}">
-                                                            Average Tahun {{ $year }} (Avg {{ substr($year, 2, 2) }})
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </li>
-                                            <li class="d-flex flex-wrap gap-2 ps-3 mb-2">
-                                                @foreach($distinctYearMonths->get($year, collect()) as $ymValue)
-                                                    <div class="form-check form-check-inline m-0">
-                                                        <input class="form-check-input" type="checkbox" name="pivot_months[]" id="ym_{{ $ymValue }}" value="{{ $ymValue }}" @checked(in_array($ymValue, $pivot_months))>
-                                                        <label class="form-check-label" for="ym_{{ $ymValue }}" style="width: 35px;">
-                                                            {{ ['01' => 'Jan','02' => 'Feb','03' => 'Mar','04' => 'Apr','05' => 'Mei','06' => 'Jun','07' => 'Jul','08' => 'Agu','09' => 'Sep','10' => 'Okt','11' => 'Nov','12' => 'Des'][substr($ymValue,5,2)] }}
-                                                        </label>
-                                                    </div>
-                                                @endforeach
-                                            </li>
-                                        @empty
-                                            <li><span class="dropdown-item-text text-muted">Tidak ada data efektif tanggal di database.</span></li>
-                                        @endforelse
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><span class="dropdown-item-text text-muted">Klik di luar untuk menutup.</span></li>
-                                    </ul>
+                                <label class="form-label fw-bold">Yearly (Totals / Averages)</label>
+                                <div class="card p-3 h-100">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Pilih Tahun</label>
+                                        <select id="yearlyYears" name="yearly_years[]" class="form-control form-control-sm" multiple>
+                                            @foreach($distinctYears as $year)
+                                                <option value="{{ $year }}">{{ $year }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="mt-2">
+                                        <label class="form-label small mb-1">Mode</label>
+                                        <select id="yearlyMode" class="form-control form-control-sm">
+                                            <option value="total">Total</option>
+                                            <option value="avg">Average</option>
+                                        </select>
+                                        <div class="small text-muted mt-1">Pilih apakah menampilkan Total atau Rata-rata untuk tahun yang dipilih.</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-lg-2 col-md-4">
-                                <label class="form-label">Item Number</label>
-                                <input type="text" name="item_number_term" value="{{ $item_number_term }}" class="form-control form-control-sm" placeholder="Cari Item No">
-                            </div>
-                            <div class="col-lg-2 col-md-4">
-                                <label class="form-label">Item Group</label>
-                                <input type="text" name="item_group_term" value="{{ $item_group_term }}" class="form-control form-control-sm" placeholder="Cari Grup">
-                            </div>
-                            <div class="col-lg-2 col-md-4">
-                                <label class="form-label">DEPT</label>
-                                <input type="text" name="dept_term" value="{{ $dept_term }}" class="form-control form-control-sm" placeholder="Cari DEPT">
-                            </div>
 
-                            <div class="col-lg-6">
-                                <label class="form-label">Item Description</label>
-                                <input type="text" name="item_description_term" value="{{ $item_description_term }}" class="form-control form-control-sm" placeholder="Cari Deskripsi">
-                            </div>
-                            <div class="col-lg-6">
-                                <label class="form-label">Remarks</label>
-                                <input type="text" name="remarks_term" value="{{ $remarks_term }}" class="form-control form-control-sm" placeholder="Cari Remarks">
+                            <div class="col-lg-6 col-md-12">
+                                <label class="form-label fw-bold">Monthly (Pilih Bulan per Tahun)</label>
+                                <div class="card p-3 h-100">
+                                    <div class="row">
+                                        <div class="col-5">
+                                            <label class="form-label small mb-1">Pilih Tahun (untuk Bulanan)</label>
+                                            <select id="monthlyYears" name="monthly_years[]" class="form-control form-control-sm" multiple>
+                                                @foreach($distinctYears as $year)
+                                                    <option value="{{ $year }}">{{ $year }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-7">
+                                            <label class="form-label small mb-1">Pilih Bulan (per tahun)</label>
+                                            <div id="monthlyMonthsContainer" class="p-1" style="max-height:160px; overflow:auto; border:1px solid #e9ecef; border-radius:4px;">
+                                                @foreach($distinctYearMonths as $yr => $mList)
+                                                    <div class="monthly-year-group mb-2" data-year="{{ $yr }}" style="display:none;">
+                                                        <div class="fw-bold small mb-1">{{ $yr }}</div>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @foreach($mList as $ym)
+                                                                @php
+                                                                    try {
+                                                                        $label = \Carbon\Carbon::createFromFormat('Y-m', $ym)->format('M');
+                                                                    } catch (\Exception $e) {
+                                                                        $label = substr($ym,5,2);
+                                                                    }
+                                                                @endphp
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input monthly-month-checkbox" type="checkbox" id="month_{{ $ym }}" value="{{ $ym }}">
+                                                                    <label class="form-check-label" for="month_{{ $ym }}">{{ $label }}</label>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                            <div class="small text-muted mt-1">Pilih tahun di sebelah kiri untuk menunjukkan kotak bulan yang relevan, lalu centang bulan yang diinginkan.</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    @endif
-                </div>
-
-                <div class="card-footer d-flex justify-content-end gap-2">
-                    <button type="button" id="exportBtn" class="btn align-left btn-outline-primary">
-                        <i class="fas fa-download me-1"></i> Download Selected XLSX
-                    </button>
-
-                    <input type="hidden" name="mode" value="{{ $mode }}">
-                    <button type="submit" class="btn btn-success shadow">
-                        <i class="fas fa-search me-1"></i> Apply Filters
-                    </button>
-                    <a href="{{ route('items.index') }}" class="btn btn-outline-secondary shadow">
-                        <i class="fas fa-undo me-1"></i> Reset Filter
-                    </a>
-                </div>
-            </div>
-        </div>
-    </form>
+                        <div class="row g-3 mt-3">
+                            <div class="col-lg-4">
+                                <label class="form-label">Item Number</label>
+                                @php
+                                    $itemNumbers = DB::table('items')->select('item_number')->distinct()->whereNotNull('item_number')->where('item_number', '!=', '')->orderBy('item_number')->pluck('item_number');
+                                @endphp
+                                <select name="item_number_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih Item Number --</option>
+                                    @foreach($itemNumbers as $num)
+                                        <option value="{{ $num }}" @selected($item_number_term === $num)>{{ $num }}</option>w
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label">Item Group</label>
+                                <select name="item_group_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih Item Group --</option>
+                                    @foreach(DB::table('items')->select('item_group')->distinct()->whereNotNull('item_group')->where('item_group', '!=', '')->orderBy('item_group')->pluck('item_group') as $group)
+                                        <option value="{{ $group }}" @selected($item_group_term === $group)>{{ $group }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label">DEPT</label>
+                                <select name="dept_term" class="form-control form-control-sm">
+                                    <option value="">-- Pilih DEPT --</option>
+                                    @foreach(DB::table('items')->select('dept')->distinct()->whereNotNull('dept')->where('dept', '!=', '')->orderBy('dept')->pluck('dept') as $dept)
+                                        <option value="{{ $dept }}" @selected($dept_term === $dept)>{{ $dept }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                     @endif
+                 </div>
+ 
+                 <div class="card-footer d-flex justify-content-end gap-2">
+                     <button type="button" id="exportBtn" class="btn btn-outline-primary">
+                        <i class="fas fa-download me-1"></i> Download Selected CSV
+                     </button>
+ 
+                     <input type="hidden" name="mode" value="{{ $mode }}">
+                     <button type="submit" class="btn btn-success shadow">
+                         <i class="fas fa-search me-1"></i> Apply Filters
+                     </button>
+                     <a href="{{ route('items.index') }}" class="btn btn-outline-secondary shadow">
+                         <i class="fas fa-undo me-1"></i> Reset Filter
+                     </a>
+                 </div>
+             </div>
+         </div>
+     </form>
 
     <div class="d-flex mb-3 gap-2">
+        <a href="{{ route('items.index', array_merge(request()->query(), ['mode' => 'resume'])) }}" class="btn {{ $mode == 'resume' ? 'btn-info text-white shadow-lg' : 'btn-outline-info' }}">
+            <i class="fas fa-table me-1"></i> Resume (Monthly Pivot)
+        </a>
         @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? Auth::user()->hasRole('Admin') : (Auth::user()->is_admin ?? false)))
             <a href="{{ route('items.index', array_merge(request()->query(), ['mode' => 'details'])) }}" class="btn {{ $mode == 'details' ? 'btn-info text-white shadow-lg' : 'btn-outline-info' }}">
                 <i class="fas fa-list-ul me-1"></i> Details (All Records)
             </a>
         @endif
-        <a href="{{ route('items.index', array_merge(request()->query(), ['mode' => 'resume'])) }}" class="btn {{ $mode == 'resume' ? 'btn-info text-white shadow-lg' : 'btn-outline-info' }}">
-            <i class="fas fa-table me-1"></i> Resume (Monthly Pivot)
-        </a>
     </div>
 
     <form id="exportForm" method="POST" action="{{ route('items.exportSelected') }}">
         @csrf
         <input type="hidden" name="mode" id="exportMode" value="{{ $mode }}">
-        @foreach($months as $m)
-            <input type="hidden" name="months[]" value="{{ $m['key'] }}">
+        @foreach($pivot_months as $p)
+            <input type="hidden" name="pivot_months[]" value="{{ $p }}">
         @endforeach
 
         <div class="card shadow-lg">
@@ -174,7 +225,7 @@
                                     <tr>
                                         <th style="width:36px"><input type="checkbox" id="select-all-details"></th>
                                         <th class="text-nowrap">Item Number</th>
-                                        <th class="text-nowrap">Item Description</th>
+                                        <th class="text-nowrap bg-primary text-white">Item Description</th>
                                         <th class="text-nowrap">Effective Date</th>
                                         <th>Bulan</th>
                                         <th class="text-nowrap text-end">Loc Qty Change</th>
@@ -189,7 +240,7 @@
                                         <tr>
                                             <td><input type="checkbox" class="select-detail" value="{{ $item->id }}"></td>
                                             <td class="text-nowrap">{{ $item->item_number }}</td>
-                                            <td style="max-width:250px;">{{ $item->item_description }}</td>
+                                            <td style="max-width:250px; background-color: #e7f1ff;">{{ $item->item_description }}</td>
                                             <td class="text-nowrap">
                                                 @if ($item->effective_date instanceof \DateTime || $item->effective_date instanceof \Carbon\Carbon)
                                                     {{ $item->effective_date->format('d/m/Y') }}
@@ -199,7 +250,7 @@
                                             </td>
                                             <td>{{ $item->bulan }}</td>
                                             <td class="text-end font-monospace {{ $item->loc_qty_change < 0 ? 'text-danger fw-bold' : 'text-success' }}">
-                                                {{ number_format($item->loc_qty_change, 2, ',', '.') }}
+                                                {{ intval($item->loc_qty_change) }}
                                             </td>
                                             <td>{{ $item->unit_of_measure }}</td>
                                             <td style="max-width:200px; word-wrap:break-word;">{{ $item->remarks }}</td>
@@ -215,30 +266,30 @@
                                     <tr>
                                         <th style="width:36px"><input type="checkbox" id="select-all-resume"></th>
                                         <th class="text-nowrap">Item Number</th>
-                                        <th class="text-nowrap">Item Description</th>
+                                        <th class="text-nowrap bg-primary text-white">Item Description</th>
                                         <th class="text-nowrap">UOM</th>
                                         @if (count($months) > 0)
                                             @foreach($months as $m)
-                                                <th class="text-nowrap text-center">{{ $m['label'] }}</th>
+                                                <th class="text-nowrap text-center" style="min-width:80px;">{{ $m['label'] }}</th>
                                             @endforeach
                                         @endif
-                                        <th class="text-nowrap text-center">Total Qty</th>
+                                        <th class="text-nowrap text-center" style="min-width:90px;">Total Qty</th>
                                         <th class="text-nowrap">DEPT</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($summary_rows as $row)
-                                        <tr class="resume-row-clickable" data-item-key="{{ $row['item_number'] }}||{{ $row['item_description'] }}||{{ $row['unit_of_measure'] }}||{{ $row['dept'] }}" data-id-list="{{ $row['row_ids'] ?? '' }}" style="cursor: pointer;" title="Klik untuk melihat detail semua transaksi item ini">
+                                        <tr class="resume-row-clickable" data-item-key="{{ $row['item_number'] }}||{{ $row['item_description'] }}||{{ $row['unit_of_measure'] }}||{{ $row['dept'] }}" data-id-list="{{ $row['row_ids'] ?? '' }}" style="cursor: pointer;" title="Klik untuk melihat detail">
                                             <td class="select-cell"><input type="checkbox" class="select-resume" value="{{ $row['row_ids'] ?? '' }}"></td>
                                             <td class="text-nowrap">{{ $row['item_number'] }}</td>
-                                            <td style="max-width:300px;">{{ $row['item_description'] }}</td>
+                                            <td style="max-width:300px; background-color: #e7f1ff;">{{ $row['item_description'] }}</td>
                                             <td>{{ $row['unit_of_measure'] }}</td>
                                             @if (count($months) > 0)
                                                 @foreach($months as $m)
-                                                    <td class="text-end font-monospace">{{ number_format($row['months'][$m['key']] ?? 0, 2, ',', '.') }}</td>
+                                                    <td class="text-end font-monospace" style="min-width:80px;">{{ intval($row['months'][$m['key']] ?? 0) }}</td>
                                                 @endforeach
                                             @endif
-                                            <td class="text-end fw-bold font-monospace bg-light">{{ number_format($row['total'], 2, ',', '.') }}</td>
+                                            <td class="text-end fw-bold font-monospace bg-light" style="min-width:90px;">{{ intval($row['total']) }}</td>
                                             <td class="text-nowrap">{{ $row['dept'] }}</td>
                                         </tr>
                                     @endforeach
@@ -282,7 +333,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item (Resume)</h5>
+                    <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -313,96 +364,182 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(function() {
-    const $detailModal = $('#pivotDetailModal');
-    const $detailLoading = $('#detail-loading');
-    const $detailContent = $('#detail-content');
-    const $detailItemInfo = $('#detail-item-info');
-    const $detailTotalInfo = $('#detail-total-info');
-    const currentUrl = '{{ route('items.index') }}';
-    const pivotMonths = @json($months ?? []);
+    const selectedPivot = @json($pivot_months ?? []);
+    const distinctYearMonths = @json($distinctYearMonths ?? []);
+    const mode = '{{ $mode }}';
 
-    function formatQty(qty) {
-        const n = parseFloat(qty) || 0;
-        return n.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function updateMonthsCount() {
+        const count = ($('.monthly-month-checkbox:checked').length) || 0;
+        $('#months-selected-count').text(count + ' Bulan terpilih');
+    }
+    updateMonthsCount();
+
+    // keep item_number text inputs uppercase (if any)
+    $('input[name="item_number_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
+
+    function rebuildPivotHiddenInputs() {
+        $('input[name="pivot_months[]"]').remove();
+        // yearly selection + mode
+        const yearly = $('#yearlyYears').val() || [];
+        const yearlyMode = $('#yearlyMode').val() || 'total';
+        yearly.forEach(function(y) {
+            const val = 'YEARLY-' + y + '|' + yearlyMode;
+            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: val}).appendTo('#filterForm');
+        });
+        // monthly selections (explicit YYYY-MM values from checkboxes)
+        const monthly = $('.monthly-month-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
+        monthly.forEach(function(ym) {
+            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo('#filterForm');
+        });
     }
 
+    // when user changes monthlyYears, show/hide corresponding month groups
+    function syncMonthlyGroupsVisibility() {
+        const selYears = $('#monthlyYears').val() || [];
+        $('.monthly-year-group').each(function(){
+            const y = $(this).data('year') + '';
+            if (selYears.indexOf(y) !== -1) $(this).show();
+            else $(this).hide().find('.monthly-month-checkbox').prop('checked', false);
+        });
+    }
+
+    $('#yearlyYears, #yearlyMode').on('change', function() {
+        rebuildPivotHiddenInputs();
+    });
+
+    $('#monthlyYears').on('change', function(){
+        syncMonthlyGroupsVisibility();
+        rebuildPivotHiddenInputs();
+        updateMonthsCount();
+    });
+
+    $(document).on('change', '.monthly-month-checkbox', function(){
+        rebuildPivotHiddenInputs();
+        updateMonthsCount();
+    });
+
+    // initialize groups from server data and selectedPivot
+    function syncFromServerPivot() {
+        const yrs = [];
+        const monthVals = [];
+        selectedPivot.forEach(function(p) {
+            if (String(p).startsWith('YEARLY-')) {
+                const parts = String(p).replace('YEARLY-','').split('|');
+                const y = parts[0];
+                yrs.push(y);
+                if (parts[1] && parts[1] === 'avg') {
+                    $('#yearlyMode').val('avg');
+                }
+            } else if (/^\d{4}-\d{2}$/.test(String(p))) {
+                monthVals.push(String(p));
+            }
+        });
+        if (yrs.length) {
+            $('#yearlyYears').val(yrs);
+        }
+        // set monthlyYears based on monthVals (extract years)
+        const monthYears = monthVals.map(function(m){ return m.slice(0,4); }).filter(function(v,i,a){ return a.indexOf(v) === i; });
+        if (monthYears.length) {
+            $('#monthlyYears').val(monthYears);
+        }
+        // show groups then check specific months
+        syncMonthlyGroupsVisibility();
+        monthVals.forEach(function(m){
+            $('#month_' + m).prop('checked', true);
+        });
+        rebuildPivotHiddenInputs();
+        updateMonthsCount();
+    }
+    // call after DOM built
+    syncFromServerPivot();
+
+    const $detailModal = $('#pivotDetailModal');
+    const currentUrl = '{{ route('items.index') }}';
+    const pivotMonths = @json($months ?? []);
+    function formatQty(qty) { const n = parseInt(qty) || 0; return n.toLocaleString('id-ID'); }
     $(document).on('click', '.resume-row-clickable td:not(.select-cell)', function(event) {
         const $row = $(this).closest('.resume-row-clickable');
         const itemKey = $row.data('item-key') || '';
         const idList = $row.data('id-list') || '';
         if (!idList) return;
-        $detailContent.hide();
-        $detailLoading.show();
+        $('#detail-content').hide();
+        $('#detail-loading').show();
         $detailModal.modal('show');
         const parts = itemKey.split('||');
         const itemNumber = parts[0] || '';
         const itemDesc = parts[1] || '';
         const uom = parts[2] || '';
         const dept = parts[3] || '';
-        $detailItemInfo.text(itemNumber + ' - ' + itemDesc + ' (' + uom + ') - DEPT: ' + dept);
-        $detailTotalInfo.text('');
-        $('#detail-table-container').html('<table class="table table-striped table-bordered table-sm"><thead class="sticky-top bg-light"><tr><th>Remark (Month chosen)</th></tr></thead><tbody id="detail-table-body"></tbody></table>');
+        $('#detail-item-info').text(itemNumber + ' - ' + itemDesc + ' (' + uom + ') - DEPT: ' + dept);
+        $('#detail-total-info').text('');
+        $('#detail-table-container').html('<table class="table table-striped table-bordered table-sm"><thead class="sticky-top bg-light"><tr><th>Remark</th></tr></thead><tbody id="detail-table-body"></tbody></table>');
         $.ajax({
             url: currentUrl,
             type: 'GET',
             dataType: 'json',
-            data: {
-                action: 'pivot_row_details',
-                item_key: itemKey,
-                id_list: idList
-            },
+            data: { action: 'pivot_row_details', item_key: itemKey, id_list: idList },
             success: function(response) {
                 const displayKeys = pivotMonths.map(function(m){ return String(m.key); });
                 const displayLabels = pivotMonths.map(function(m){ return String(m.label); });
-                const monthKeys = displayKeys.filter(function(k){ return !k.startsWith('AVG-'); });
-                const monthLabels = displayLabels.filter(function(_, i){ return !displayKeys[i].startsWith('AVG-'); });
-                const avgKeys = displayKeys.filter(function(k){ return k.startsWith('AVG-'); });
-                const avgLabels = displayLabels.filter(function(_, i){ return displayKeys[i].startsWith('AVG-'); });
+                const monthKeys = displayKeys.filter(function(k){ return !k.startsWith('YEARLY-'); });
+                const monthLabels = displayLabels.filter(function(_, i){ return !displayKeys[i].startsWith('YEARLY-'); });
+                const yearlyKeys = displayKeys.filter(function(k){ return k.startsWith('YEARLY-'); });
+                const yearlyLabels = displayLabels.filter(function(_, i){ return displayKeys[i].startsWith('YEARLY-'); });
                 const groups = {};
                 let grandTotal = 0;
                 if (Array.isArray(response.details) && response.details.length > 0) {
                     response.details.forEach(function(detail) {
                         const remark = (detail.remarks || '').trim() || '(No Remark)';
-                        const mkey = detail.effective_date ? detail.effective_date.slice(0,7) : (detail.bulan_key || detail.bulan || '');
-                        const qty = parseFloat(detail.loc_qty_change) || 0;
-                        if (!groups[remark]) groups[remark] = { months: {}, total: 0 };
+                        const mkey = detail.effective_date ? detail.effective_date.slice(0,7) : '';
+                        const qty = parseInt(detail.loc_qty_change) || 0;
+                        if (!groups[remark]) groups[remark] = { months: {}, total: 0, annual_totals: {}, annual_months_set: {} };
                         groups[remark].months[mkey] = (groups[remark].months[mkey] || 0) + qty;
                         const year = String(mkey).slice(0,4);
-                        groups[remark].annual_totals = groups[remark].annual_totals || {};
-                        groups[remark].annual_months_set = groups[remark].annual_months_set || {};
                         groups[remark].annual_totals[year] = (groups[remark].annual_totals[year] || 0) + qty;
                         groups[remark].annual_months_set[year] = groups[remark].annual_months_set[year] || {};
                         if (mkey) groups[remark].annual_months_set[year][mkey] = true;
                         groups[remark].total += qty;
                         grandTotal += qty;
                     });
-                    if (monthKeys.length > 0) {
-                        let thead = '<tr><th>Remark (Month chosen)</th>';
+                    if (monthKeys.length > 0 || yearlyKeys.length > 0) {
+                        let thead = '<tr><th>Remark</th>';
                         monthLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
-                        avgLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
+                        yearlyLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
                         thead += '<th class="text-end">Total</th></tr>';
                         let tbodyHtml = '';
+                        let monthlyTotalsByKey = {};
                         Object.keys(groups).forEach(function(remark) {
                             const g = groups[remark];
                             tbodyHtml += '<tr><td style="min-width:220px;">' + escapeHtml(remark) + '</td>';
                             monthKeys.forEach(function(k) {
                                 const val = g.months[k] || 0;
+                                monthlyTotalsByKey[k] = (monthlyTotalsByKey[k] || 0) + val;
                                 const cls = val < 0 ? 'text-danger' : 'text-success';
                                 tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                             });
-                            avgKeys.forEach(function(avgKey) {
-                                const year = avgKey.slice(4);
+                            yearlyKeys.forEach(function(yearlyKey) {
+                                const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
+                                const year = keyParts[0];
+                                const type = keyParts[1] || 'total';
                                 const annualTotal = (g.annual_totals && g.annual_totals[year]) ? g.annual_totals[year] : 0;
-                                const distinctMonthsCount = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
-                                const avgVal = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
-                                const cls = avgVal < 0 ? 'text-danger' : 'text-success';
-                                tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(avgVal) + '</td>';
+                                let val = annualTotal;
+                                if (type === 'avg') {
+                                    const distinctMonthsCount = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
+                                    val = distinctMonthsCount ? Math.round(annualTotal / distinctMonthsCount) : 0;
+                                }
+                                const cls = val < 0 ? 'text-danger' : 'text-success';
+                                tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                             });
                             tbodyHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(g.total) + '</td></tr>';
                         });
-                        const colspan = 1 + monthKeys.length + avgKeys.length;
+                        let monthlyTotalRow = '<tr class="bg-warning"><td class="fw-bold">Monthly Total</td>';
+                        monthKeys.forEach(function(k) {
+                            monthlyTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(monthlyTotalsByKey[k] || 0) + '</td>';
+                        });
+                        monthlyTotalRow += '<td colspan="' + (yearlyKeys.length + 1) + '"></td></tr>';
+                        const colspan = 1 + monthKeys.length + yearlyKeys.length;
                         const tfoot = '<tr><td colspan="' + colspan + '" class="text-end fw-bold">Grand total</td><td class="text-end fw-bold font-monospace bg-secondary text-white">' + formatQty(grandTotal) + '</td></tr>';
-                        const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + tfoot + '</tfoot></table>';
+                        const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + monthlyTotalRow + '</tbody><tfoot>' + tfoot + '</tfoot></table>';
                         $('#detail-table-container').html(tableHtml);
                     } else {
                         let tbodyHtml = '';
@@ -414,60 +551,46 @@ $(function() {
                         const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light"><tr><th>Remark</th><th class="text-end">Total</th></tr></thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + tfoot + '</tfoot></table>';
                         $('#detail-table-container').html(tableHtml);
                     }
-                    $detailTotalInfo.text(formatQty(grandTotal)).removeClass('text-danger text-success').addClass(grandTotal < 0 ? 'text-danger' : 'text-success');
+                    $('#detail-total-info').text(formatQty(grandTotal)).removeClass('text-danger text-success').addClass(grandTotal < 0 ? 'text-danger' : 'text-success');
                 } else {
                     const emptyHtml = '<div class="text-center text-muted p-3">Tidak ada transaksi detail yang ditemukan.</div>';
                     $('#detail-table-container').html(emptyHtml);
-                    $detailTotalInfo.text(formatQty(0)).removeClass('text-danger text-success').addClass('text-success');
+                    $('#detail-total-info').text(formatQty(0)).removeClass('text-danger text-success').addClass('text-success');
                 }
-                $detailLoading.hide();
-                $detailContent.show();
+                $('#detail-loading').hide();
+                $('#detail-content').show();
             },
             error: function() {
                 $('#detail-table-container').html('<div class="text-center text-danger p-3">Gagal memuat data detail.</div>');
-                $detailLoading.hide();
-                $detailContent.show();
+                $('#detail-loading').hide();
+                $('#detail-content').show();
             }
         });
     });
 
-    $('#select-all-details').on('change', function() {
-        $('.select-detail').prop('checked', $(this).is(':checked'));
-    });
-    $('#select-all-resume').on('change', function() {
-        $('.select-resume').prop('checked', $(this).is(':checked'));
-    });
-    $('#clearSelectionBtn').on('click', function() {
-        $('.select-detail, .select-resume').prop('checked', false);
-        $('#select-all-details, #select-all-resume').prop('checked', false);
-    });
-
-    $(document).on('click', '.select-resume', function(e) {
-        e.stopPropagation();
-    });
+    $('#select-all-details').on('change', function() { $('.select-detail').prop('checked', $(this).is(':checked')); });
+    $('#select-all-resume').on('change', function() { $('.select-resume').prop('checked', $(this).is(':checked')); });
+    $(document).on('click', '.select-resume', function(e) { e.stopPropagation(); });
 
     $('#exportBtn').on('click', function() {
-        const mode = $('#exportMode').val();
-        let selected = [];
         if (mode === 'details') {
-            $('.select-detail:checked').each(function() { selected.push($(this).val()); });
+            const selected = $('.select-detail:checked').map(function(){ return $(this).val(); }).get();
+            if (selected.length === 0) { alert('Please select at least one row to export.'); return; }
+            $('#exportForm').find('input[name="selected_ids[]"]').remove();
+            selected.forEach(function(val){ $('<input>').attr({type:'hidden', name:'selected_ids[]', value: val}).appendTo('#exportForm'); });
+            $('#exportForm')[0].submit();
         } else {
-            $('.select-resume:checked').each(function() { selected.push($(this).val()); });
+            const selected = $('.select-resume:checked').map(function(){ return $(this).val(); }).get();
+            if (selected.length === 0) { alert('Pilih setidaknya satu baris untuk diunduh.'); return; }
+            const monthsParam = [];
+            const hiddenPivot = $('input[name="pivot_months[]"]').map(function(){ return $(this).val(); }).get();
+            hiddenPivot.forEach(function(h){ if (!h.startsWith('YEARLY-')) monthsParam.push(h); });
+            const params = { id_lists: selected.join('||'), months: monthsParam.join(',') };
+            window.location.href = '{{ route('items.exportResumeDetail') }}?' + $.param(params);
         }
-        if (selected.length === 0) {
-            alert('Please select at least one row to export.');
-            return;
-        }
-        $('#exportForm').find('input[name="selected_ids[]"]').remove();
-        selected.forEach(function(val) {
-            $('<input>').attr({type: 'hidden', name: 'selected_ids[]', value: val}).appendTo('#exportForm');
-        });
-        $('#exportForm')[0].submit();
     });
 
-    function escapeHtml(unsafe) {
-        return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
+    function escapeHtml(unsafe) { return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 });
 </script>
 @endsection
