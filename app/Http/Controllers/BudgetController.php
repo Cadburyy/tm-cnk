@@ -32,6 +32,7 @@ class BudgetController extends Controller
 
         $raw_selections = $request->input('pivot_months', []);
         $item_number_term = $request->input('item_number_term');
+        $item_description_term = $request->input('item_description_term'); 
         
         $query = Budget::query();
         $query->orderBy('effective_date', 'desc')->orderBy('item_number', 'asc');
@@ -61,6 +62,9 @@ class BudgetController extends Controller
         
         if ($item_number_term) {
             $query->where('item_number', 'LIKE', '%' . $item_number_term . '%');
+        }
+        if ($item_description_term) {
+            $query->where('item_description', 'LIKE', '%' . $item_description_term . '%');
         }
 
         $budgets = $query->get();
@@ -144,6 +148,7 @@ class BudgetController extends Controller
             'budgets' => $budgets,
             'pivot_months' => $raw_selections,
             'item_number_term' => $item_number_term,
+            'item_description_term' => $item_description_term,
             'itemNumbers' => $itemNumbers,
             'distinctYears' => $distinctYears,
             'distinctYearMonths' => $distinctYearMonths,
@@ -353,4 +358,46 @@ class BudgetController extends Controller
             return back()->with('error', 'Export failed: ' . $e->getMessage());
         }
     }
-}
+    
+    // ADDED ADMIN METHOD: DELETE
+    public function destroy($id)
+    {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+            return back()->with('error', 'Unauthorized access.');
+        }
+        // Assuming deletion is for a single transaction/budget row by ID
+        $deleted = Budget::destroy($id);
+        if ($deleted) {
+            return back()->with('success', 'Budget record deleted successfully.');
+        }
+        return back()->with('error', 'Failed to delete record.');
+    }
+    
+    // ADDED ADMIN METHOD: EDIT (Placeholder)
+    public function edit($id)
+    {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+             return redirect()->route('budget.index')->with('error', 'Unauthorized access.');
+        }
+        $budget = Budget::findOrFail($id);
+        return view('budget.edit', compact('budget')); // Assuming you have a budget.edit view
+    }
+    
+    // ADDED ADMIN METHOD: UPDATE (Placeholder)
+    public function update(Request $request, $id)
+    {
+         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+             return redirect()->route('budget.index')->with('error', 'Unauthorized access.');
+         }
+         $request->validate([
+             'item_number' => 'required',
+             'budget' => 'required|numeric',
+             // Add other validation rules as needed
+         ]);
+         
+         $budget = Budget::findOrFail($id);
+         $budget->update($request->all());
+         
+         return redirect()->route('budget.index')->with('success', 'Budget record updated successfully.');
+    }
+}   

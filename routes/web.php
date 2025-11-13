@@ -23,12 +23,13 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::middleware(['auth'])->group(function () {
     Route::resource('roles', RoleController::class);
     Route::resource('users', UserController::class);
-    Route::resource('items', ItemController::class)->only(['index', 'store']);
-    Route::resource('budget', BudgetController::class)->only(['index', 'store']);
 
+    
+    Route::resource('items', ItemController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
     Route::get('/items/export-resume-detail', [ItemController::class, 'exportResumeDetail'])->name('items.exportResumeDetail');
     Route::post('/items/export-selected', [ItemController::class, 'exportSelected'])->name('items.exportSelected');
 
+    Route::resource('budget', BudgetController::class)->only(['index', 'store', 'edit', 'update', 'destroy']); 
     Route::post('/budget/export-selected', [BudgetController::class, 'exportSelected'])->name('budget.exportSelected');
 });
 

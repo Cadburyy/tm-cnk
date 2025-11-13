@@ -178,7 +178,7 @@
                 <div class="chart-container" style="height: 400px;">
                     <canvas id="barChart"></canvas>
                 </div>
-                <p class="mt-3 small text-muted text-center">Kuantitas Item (Qty) vs. Budget (per bulan).</p>
+                <p class="mt-3 small text-muted text-center">Kuantitas Item (Qty) [Absolut] vs. Budget (per bulan).</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -207,7 +207,7 @@
     
     const tooltipFraudItems = {
         'Surplus/Healthy': 'Total surplus items (Qty + Budget > 0)',
-        'Defisit/Fraud': 'Total deficit items (Qty + Budget < 0)',
+        'Defisit/Fraud': 'Total deficit items (Qty + Budget < 0). Klik untuk melihat rincian item.',
     };
 
     let currentBarChart = null;
@@ -227,7 +227,8 @@
         
         allMonths.forEach(month => {
             const data = itemMonthlyData[month] || {};
-            qtyData.push(data.qty || 0);
+            // Force Qty data to be positive (absolute value)
+            qtyData.push(Math.abs(data.qty || 0)); 
             budgetData.push(data.budget || 0);
         });
 
@@ -246,15 +247,17 @@
                 }),
                 datasets: [
                     {
-                        label: 'Item Qty (Transaksi)',
+                        label: 'Item Qty (Transaksi) [Absolut]',
                         data: qtyData,
-                        backgroundColor: '#28a745', 
+                        // CHANGED: Transaction (Qty) to Red
+                        backgroundColor: '#dc3545', 
                         yAxisID: 'y',
                     },
                     {
                         label: 'Budget Allocated',
                         data: budgetData,
-                        backgroundColor: '#007bff', 
+                        // CHANGED: Budget to Green
+                        backgroundColor: '#28a745', 
                         yAxisID: 'y',
                     }
                 ]
@@ -339,6 +342,7 @@
         FRAUD_ITEMS_RAW.forEach(item => {
             const prefix = item.item_number.substring(0, 4).toUpperCase();
             
+            // If no prefixes are selected OR the item's prefix is in the selected list
             if (selectedPrefixes.length === 0 || selectedPrefixes.includes(prefix)) {
                 listHtml += `
                     <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger py-2">
@@ -366,9 +370,11 @@
         if (@json($canRenderChart)) {
              initializeCharts();
         }
-
+        
+        // Initial rendering of the list (without filters applied)
         renderFraudList([]);
 
+        // Filter Change Handler
         $(document).on('change', '.prefix-filter-checkbox', function() {
             const selected = $('.prefix-filter-checkbox:checked').map(function(){ 
                 return $(this).val(); 
@@ -376,6 +382,7 @@
             renderFraudList(selected);
         });
 
+        // Click handler for 'View Monthly Trend' buttons in the list
         $(document).on('click', '.view-item-detail', function() {
             const itemNumber = $(this).data('item-number');
             createBarChart(itemNumber);

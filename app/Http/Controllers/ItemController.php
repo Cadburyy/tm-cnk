@@ -555,4 +555,46 @@ class ItemController extends Controller
             return back()->with('error', 'Export failed. Check logs.');
         }
     }
+    
+    // ADDED ADMIN METHOD: DELETE
+    public function destroy($id)
+    {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+            return back()->with('error', 'Unauthorized access.');
+        }
+        // Delete by single ID (used in Details mode)
+        $deleted = Item::destroy($id);
+        if ($deleted) {
+            return back()->with('success', 'Item transaction deleted successfully.');
+        }
+        return back()->with('error', 'Failed to delete record.');
+    }
+    
+    // ADDED ADMIN METHOD: EDIT (Placeholder)
+    public function edit($id)
+    {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+             return redirect()->route('items.index')->with('error', 'Unauthorized access.');
+        }
+        $item = Item::findOrFail($id);
+        return view('items.edit', compact('item')); // Assuming an items.edit view exists
+    }
+    
+    // ADDED ADMIN METHOD: UPDATE (Placeholder)
+    public function update(Request $request, $id)
+    {
+         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+             return redirect()->route('items.index')->with('error', 'Unauthorized access.');
+         }
+         $request->validate([
+             'item_number' => 'required',
+             'loc_qty_change' => 'required|numeric',
+             // Add other validation rules as needed
+         ]);
+         
+         $item = Item::findOrFail($id);
+         $item->update($request->all());
+         
+         return redirect()->route('items.index')->with('success', 'Item transaction updated successfully.');
+    }
 }

@@ -143,7 +143,7 @@
                             </div>
                         </div>
                         <div class="row g-3 mt-3">
-                            <div class="col-lg-6">
+                            <div class="col-lg-4">
                                 <label class="form-label">Item Number</label>
                                 <input list="itemNumbers" name="item_number_term" id="item-number-input"
                                     class="form-control form-control-sm" value="{{ $item_number_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
@@ -153,7 +153,12 @@
                                     @endforeach
                                 </datalist>
                             </div>
-                            <div class="col-lg-6">
+                            {{-- ADDED: Item Description Filter for Resume Mode --}}
+                            <div class="col-lg-4">
+                                <label class="form-label">Item Description</label>
+                                <input type="text" name="item_description_term" class="form-control form-control-sm" value="{{ $item_description_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
+                            </div>
+                            <div class="col-lg-4">
                                 <label class="form-label">Departemen</label>
                                 <input list="depts" name="dept_term" id="dept-input"
                                     class="form-control form-control-sm" value="{{ $dept_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
@@ -223,6 +228,7 @@
                                 <thead class="bg-light sticky-top">
                                     <tr>
                                         <th style="width:36px"><input type="checkbox" id="select-all-details"></th>
+                                        <th class="text-nowrap">Aksi</th>
                                         <th class="text-nowrap">Item Number</th>
                                         <th class="text-nowrap bg-primary text-white">Item Description</th>
                                         <th class="text-nowrap">Effective Date</th>
@@ -238,6 +244,17 @@
                                     @foreach($items as $item)
                                         <tr>
                                             <td><input type="checkbox" class="select-detail" value="{{ $item->id }}"></td>
+                                            {{-- ADDED: Action Buttons for Admin --}}
+                                            <td class="text-nowrap">
+                                                @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false)))
+                                                    <a href="{{ route('items.edit', $item->id) }}" class="btn btn-sm btn-warning me-1"><i class="fas fa-edit"></i></a>
+                                                    <form action="{{ route('items.destroy', $item->id) }}" method="POST" class="d-inline delete-form">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="button" class="btn btn-sm btn-danger delete-btn" data-record-id="{{ $item->id }}" data-record-desc="Item #{{ $item->id }} ({{ $item->item_number }})"><i class="fas fa-trash"></i></button>
+                                                    </form>
+                                                @endif
+                                            </td>
                                             <td class="text-nowrap">{{ $item->item_number }}</td>
                                             <td style="max-width:250px; background-color: #e7f1ff;">{{ $item->item_description }}</td>
                                             <td class="text-nowrap">
@@ -285,10 +302,12 @@
                                             <td>{{ $row['unit_of_measure'] }}</td>
                                             @if (count($months) > 0)
                                                 @foreach($months as $m)
-                                                    <td class="text-end font-monospace" style="min-width:80px;">{{ intval($row['months'][$m['key']] ?? 0) }}</td>
+                                                    @php $val = intval($row['months'][$m['key']] ?? 0); @endphp
+                                                    <td class="text-end font-monospace {{ $val < 0 ? 'text-danger fw-bold' : 'text-success' }}" style="min-width:80px;">{{ $val }}</td>
                                                 @endforeach
                                             @endif
-                                            <td class="text-end fw-bold font-monospace bg-light" style="min-width:90px;">{{ intval($row['total']) }}</td>
+                                            @php $totalVal = intval($row['total']); @endphp
+                                            <td class="text-end fw-bold font-monospace bg-light {{ $totalVal < 0 ? 'text-danger' : 'text-success' }}" style="min-width:90px;">{{ $totalVal }}</td>
                                             <td class="text-nowrap">{{ $row['dept'] }}</td>
                                         </tr>
                                     @endforeach
@@ -328,8 +347,9 @@
         </div>
     </div>
 
+    {{-- Change #3: Modal Size Changed to modal-xl --}}
     <div class="modal fade" id="pivotDetailModal" tabindex="-1" aria-labelledby="pivotDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl"> 
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
                     <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item + Budget</h5>
@@ -343,10 +363,20 @@
                         <p class="mt-2">Memuat data transaksi dan budget...</p>
                     </div>
                     <div id="detail-content" style="display: none;">
-                        <p class="fw-bold mb-1">Item:</p>
-                        <p class="mb-2 ps-2" id="detail-item-info"></p>
-                        <p class="fw-bold mb-1">Combined Total (Qty + Budget):</p>
-                        <p class="mb-3 ps-2 fw-bold" id="detail-total-info"></p>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <p class="fw-bold mb-1">Item:</p>
+                                <p class="mb-2 ps-2" id="detail-item-info"></p>
+                                <p class="fw-bold mb-1">Combined Total (Qty + Budget):</p>
+                                <p class="mb-0 ps-2 fw-bold" id="detail-total-info"></p>
+                            </div>
+                            {{-- Change #4: Download Button --}}
+                            <div>
+                                <button id="downloadModalDataBtn" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-download me-1"></i> Download Detail CSV
+                                </button>
+                            </div>
+                        </div>
                         <div class="table-responsive" style="max-height: 50vh;">
                             <div id="detail-table-container"></div>
                         </div>
@@ -358,10 +388,128 @@
             </div>
         </div>
     </div>
+    
+    {{-- ADDED: Custom Delete Confirmation Modal --}}
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content border-danger">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel"><i class="fas fa-exclamation-triangle me-2"></i> Konfirmasi Penghapusan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-2 fw-bold text-danger">Anda yakin ingin menghapus data ini?</p>
+                    <p class="small text-muted mb-3">Aksi ini tidak dapat dibatalkan. Data yang dihapus:</p>
+                    <p class="mb-0 text-dark fw-bold" id="deleteRecordDesc"></p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">Hapus Permanen</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+// Global variable to hold the form reference
+let deleteFormToSubmit = null;
+
+$(document).on('click', '.delete-btn', function(e) {
+    e.preventDefault();
+    
+    // Store the form element
+    deleteFormToSubmit = $(this).closest('form');
+    
+    // Get description data from the button's data attributes
+    const recordDesc = $(this).data('record-desc') || 'Record ID: ' + $(this).data('record-id');
+    
+    // Update modal content
+    $('#deleteRecordDesc').text(recordDesc);
+    
+    // Show modal
+    $('#deleteConfirmModal').modal('show');
+});
+
+$('#confirmDeleteBtn').on('click', function() {
+    if (deleteFormToSubmit) {
+        // Hide modal before submission
+        $('#deleteConfirmModal').modal('hide');
+        // Submit the stored form
+        deleteFormToSubmit.submit();
+    }
+});
+</script>
+
+<script>
+    // Utility function to convert table HTML to CSV string and download
+    function exportTableToCSV(tableId, itemKey, delimiter = ';') {
+        const $table = $('#' + tableId);
+        let csv = '';
+        const itemInfo = itemKey.split('||');
+        
+        // 1. Add Item Info Header
+        csv += `"Item Number";"${itemInfo[0]}"\n`;
+        csv += `"Item Description";"${itemInfo[1]}"\n`;
+        csv += `"UOM";"${itemInfo[2]}"\n`;
+        csv += `"DEPT";"${itemInfo[3]}"\n`;
+        csv += '\n';
+
+        // Helper to extract text and sanitize
+        const sanitize = (text) => {
+            // Remove thousand separators, remove leading/trailing spaces, replace line breaks
+            let cleaned = text.replace(/(\r\n|\n|\r)/gm, " ").trim();
+            // Handle numerical values (removes ID locale formatting for numbers)
+            let match = cleaned.match(/^-?[\d.,\s]+$/);
+            if (match) {
+                // Remove ID locale thousand separators (.), replace comma decimal (,) with dot
+                cleaned = cleaned.replace(/\./g, '').replace(/,/g, '.');
+            }
+            return `"${cleaned.replace(/"/g, '""')}"`;
+        };
+
+        // 2. Extract Table Headers (thead)
+        $table.find('thead th').each(function() {
+            csv += sanitize($(this).text()) + delimiter;
+        });
+        csv = csv.slice(0, -1) + '\n';
+
+        // 3. Extract Table Body (tbody)
+        $table.find('tbody tr').each(function() {
+            $(this).find('td').each(function() {
+                csv += sanitize($(this).text()) + delimiter;
+            });
+            csv = csv.slice(0, -1) + '\n';
+        });
+
+        // 4. Extract Table Footer (tfoot)
+        $table.find('tfoot tr').each(function() {
+            $(this).find('td').each(function() {
+                csv += sanitize($(this).text()) + delimiter;
+            });
+            csv = csv.slice(0, -1) + '\n';
+        });
+
+        const filename = 'Resume_Detail_' + itemInfo[0] + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        
+        if (navigator.msSaveBlob) { // IE 10+
+            navigator.msSaveBlob(blob, filename);
+        } else {
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    }
+
 $(function() {
     const selectedPivot = @json($pivot_months ?? []);
     const distinctYearMonths = @json($distinctYearMonths ?? []);
@@ -412,6 +560,7 @@ $(function() {
 
     if (mode === 'resume') {
         $('input[name="item_number_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
+        $('input[name="item_description_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
 
         $('.yearly-year-checkbox').on('change', function() {
             updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
@@ -484,8 +633,14 @@ $(function() {
         const pivotMonths = @json($months ?? []);
         
         function formatQty(qty) { 
-            const n = parseInt(qty) || 0; 
-            return n.toLocaleString('id-ID'); 
+            const n = parseFloat(qty) || 0; 
+            // Use minimumFractionDigits to handle averages cleanly, but keep it minimal
+            return n.toLocaleString('id-ID', { minimumFractionDigits: (n % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 }); 
+        }
+
+        function getColorClass(qty) {
+            // Updated to use text-success for positive, text-danger fw-bold for negative
+            return qty < 0 ? 'text-danger fw-bold' : 'text-success';
         }
 
         function escapeHtml(unsafe) { 
@@ -501,6 +656,9 @@ $(function() {
             const $row = $(this).closest('.resume-row-clickable');
             const itemKey = $row.data('item-key') || '';
             const idList = $row.data('id-list') || '';
+            let budgetDataCache = {}; 
+            let itemQtyDataCache = {}; 
+
             if (!idList) return;
             $('#detail-content').hide();
             $('#detail-loading').show();
@@ -512,6 +670,8 @@ $(function() {
             const dept = parts[3] || '';
             $('#detail-item-info').text(itemNumber + ' - ' + itemDesc + ' (' + uom + ') - DEPT: ' + dept);
             $('#detail-total-info').text('');
+            $('#downloadModalDataBtn').data('id-list', idList).data('item-key', itemKey); 
+
             $('#detail-table-container').html('<table class="table table-striped table-bordered table-sm"><thead class="sticky-top bg-light"><tr><th>Remark</th></tr></thead><tbody id="detail-table-body"></tbody></table>');
             
             $.ajax({
@@ -520,6 +680,7 @@ $(function() {
                 dataType: 'json',
                 data: { action: 'pivot_row_details', item_key: itemKey, id_list: idList },
                 success: function(response) {
+                    
                     const displayKeys = pivotMonths.map(function(m){ return String(m.key); });
                     const displayLabels = pivotMonths.map(function(m){ return String(m.label); });
                     const monthKeys = displayKeys.filter(function(k){ return !k.startsWith('YEARLY-'); });
@@ -529,14 +690,19 @@ $(function() {
                     
                     const isMonthlyFilterActive = monthKeys.length > 0;
                     
-                    const groups = {};
+                    const groups = {}; // Item transaction grouped by remark
                     let grandItemQtyTotal = 0;
                     
                     if (Array.isArray(response.details) && response.details.length > 0) {
                         response.details.forEach(function(detail) {
                             const remark = (detail.remarks || '').trim() || '(No Remark)';
                             const mkey = detail.effective_date ? detail.effective_date.slice(0,7) : '';
-                            const qty = parseInt(detail.loc_qty_change) || 0;
+                            const qty = parseFloat(detail.loc_qty_change) || 0; // Use float for precision
+                            
+                            if (!itemQtyDataCache[mkey]) itemQtyDataCache[mkey] = { qty: 0, annual_months_set: {} };
+                            itemQtyDataCache[mkey].qty += qty;
+                            itemQtyDataCache[mkey].annual_months_set[mkey] = true;
+
                             if (!groups[remark]) groups[remark] = { months: {}, total: 0, annual_totals: {}, annual_months_set: {} };
                             groups[remark].months[mkey] = (groups[remark].months[mkey] || 0) + qty;
                             const year = String(mkey).slice(0,4);
@@ -550,77 +716,100 @@ $(function() {
 
                     const budgetByMonth = response.budget_data || {};
                     let grandBudgetTotal = 0;
-                    let monthlyBudgetTotals = {};
-                    let monthlyCombinedTotals = {};
-                    let yearlyCombinedTotals = {};
                     let annualBudgetTotals = {};
                     let annualBudgetMonthsCount = {};
                     
                     Object.keys(budgetByMonth).forEach(function(mkey) {
                         const budgetVal = parseFloat(budgetByMonth[mkey]) || 0;
+                        const year = String(mkey).slice(0,4);
                         grandBudgetTotal += budgetVal;
-                        monthlyBudgetTotals[mkey] = budgetVal;
-                        
-                        const year = mkey.slice(0, 4);
                         annualBudgetTotals[year] = (annualBudgetTotals[year] || 0) + budgetVal;
                         annualBudgetMonthsCount[year] = annualBudgetMonthsCount[year] || {};
                         annualBudgetMonthsCount[year][mkey] = true;
+                        budgetDataCache[mkey] = { budget: budgetVal, annual_months_set: {} };
+                        budgetDataCache[mkey].annual_months_set[mkey] = true;
                     });
                     
                     const grandCombinedTotal = grandItemQtyTotal + grandBudgetTotal;
-
-                    monthKeys.forEach(function(k) {
-                        const itemVal = Object.values(groups).reduce((acc, g) => acc + (g.months[k] || 0), 0);
-                        const budgetVal = monthlyBudgetTotals[k] || 0;
-                        monthlyCombinedTotals[k] = itemVal + budgetVal;
-                    });
-
-                    yearlyKeys.forEach(function(yearlyKey) {
-                        const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
-                        const year = keyParts[0];
-                        const type = keyParts[1] || 'total';
-                        
-                        let totalItemForYear = 0;
-                        Object.values(groups).forEach(g => {
-                            totalItemForYear += (g.annual_totals[year] || 0);
-                        });
-
-                        let totalBudgetForYear = annualBudgetTotals[year] || 0;
-
-                        let totalVal = totalItemForYear + totalBudgetForYear;
-                        
-                        if (type === 'avg') {
-                            let distinctMonthsSet = {};
-                            Object.values(groups).forEach(g => {
-                                Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
-                            });
-                            Object.keys(annualBudgetMonthsCount[year] || {}).forEach(m => distinctMonthsSet[m] = true);
-                            
-                            const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
-                            totalVal = distinctMonthsCount ? Math.round(totalVal / distinctMonthsCount) : 0;
-                        }
-                        yearlyCombinedTotals[yearlyKey] = totalVal;
-                    });
-
+                    
+                    // --- FIX HERE: Separate logic for NEGATIVE total vs. comparison total ---
+                    let totalColorClass;
+                    if (grandCombinedTotal < 0) {
+                        // If the combined total is negative, it MUST be red.
+                        totalColorClass = 'text-danger fw-bold'; 
+                    } else if (grandCombinedTotal > 0) {
+                        // If positive, apply the Budget vs Qty comparison logic
+                        totalColorClass = (grandBudgetTotal > grandItemQtyTotal) ? 'text-success' : 
+                                            (grandBudgetTotal < grandItemQtyTotal) ? 'text-danger fw-bold' : 'text-success'; // If equal or budget > qty, use green/success
+                    } else {
+                        // Total is zero
+                        totalColorClass = ''; 
+                    }
+                    // ------------------------------------------------------------------------
+                    
                     if (grandItemQtyTotal !== 0 || grandBudgetTotal !== 0) {
+
+                        // START: Filtered Monthly/Yearly Display
 
                         const isAnyFilterActive = monthKeys.length > 0 || yearlyKeys.length > 0;
 
                         if (isAnyFilterActive) {
                             let thead = '<tr><th>Remark / Source</th>';
-                            monthLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
-                            yearlyLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
+                            monthLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + escapeHtml(label) + '</th>'; });
+                            yearlyLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + escapeHtml(label) + '</th>'; });
                             thead += '<th class="text-end">Total</th></tr>';
                             let tbodyHtml = '';
+                            
+                            // Calculate combined totals for the combined row (footer)
+                            let monthlyCombinedTotals = {};
+                            let yearlyCombinedTotals = {};
+                            
+                            // --- Calculate Monthly Totals (Item Qty + Budget) ---
+                            monthKeys.forEach(function(k) {
+                                const itemVal = itemQtyDataCache[k] ? itemQtyDataCache[k].qty : 0;
+                                const budgetVal = budgetDataCache[k] ? budgetDataCache[k].budget : 0;
+                                monthlyCombinedTotals[k] = itemVal + budgetVal;
+                            });
 
+                            // --- Calculate Yearly Totals (Item Qty + Budget) ---
+                            yearlyKeys.forEach(function(yearlyKey) {
+                                const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
+                                const year = keyParts[0];
+                                const type = keyParts[1] || 'total';
+                                
+                                // Aggregate Item Qty for the year
+                                let totalItemForYear = Object.values(groups).reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
+                                // Get Budget Total for the year
+                                let totalBudgetForYear = annualBudgetTotals[year] || 0;
+                                let totalVal = totalItemForYear + totalBudgetForYear;
+                                
+                                if (type === 'avg') {
+                                    // Calculate distinct months count based on both data sets
+                                    let distinctMonthsSet = {};
+                                    Object.values(groups).forEach(g => {
+                                        Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                                    });
+                                    Object.keys(budgetDataCache).forEach(mkey => {
+                                        if (mkey.startsWith(year)) distinctMonthsSet[mkey] = true;
+                                    });
+                                    
+                                    const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
+                                    totalVal = distinctMonthsCount ? (totalVal / distinctMonthsCount) : 0;
+                                }
+                                yearlyCombinedTotals[yearlyKey] = totalVal;
+                            });
+
+                            
+                            // --- Item Transaction (Grouped by Remark) Rows ---
                             Object.keys(groups).forEach(function(remark) {
                                 const g = groups[remark];
                                 tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
                                 let rowTotal = 0;
+                                
                                 monthKeys.forEach(function(k) {
                                     const val = g.months[k] || 0;
                                     rowTotal += val;
-                                    const cls = val < 0 ? 'text-danger' : 'text-success';
+                                    const cls = getColorClass(val); // Use consistent color function
                                     tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
 
@@ -632,34 +821,75 @@ $(function() {
                                     let val = annualTotal;
                                     if (type === 'avg') {
                                         const distinctMonthsCount = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
-                                        val = distinctMonthsCount ? Math.round(annualTotal / distinctMonthsCount) : 0;
+                                        val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
                                     }
                                     
-                                    const cls = val < 0 ? 'text-danger' : 'text-success';
+                                    const cls = getColorClass(val); // Use consistent color function
                                     tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
 
-                                if (!isMonthlyFilterActive && yearlyKeys.length > 0) {
+                                // FIX: Calculate row total using selected keys, prioritizing yearly if monthly is empty
+                                if (isMonthlyFilterActive) {
+                                    // If monthly active, rowTotal is already calculated by the loop above (only iterating monthKeys)
+                                } else if (yearlyKeys.length > 0) {
+                                    // If only yearly active, sum the yearly total columns (based on selected years)
                                     rowTotal = yearlyKeys.reduce((totalAcc, yk) => {
                                          const yearOnly = yk.replace('YEARLY-', '').split('|')[0];
                                          return totalAcc + (g.annual_totals[yearOnly] || 0); 
                                     }, 0);
+                                } else {
+                                     // Default to grand item total if no pivot is active (shouldn't happen here if isAnyFilterActive is true)
+                                     rowTotal = g.total;
                                 }
                                 
-                                tbodyHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(rowTotal) + '</td></tr>';
+                                // REMOVED bg-light class from here
+                                tbodyHtml += '<td class="text-end fw-bold font-monospace ' + getColorClass(rowTotal) + '">' + formatQty(rowTotal) + '</td></tr>';
                             });
+                            
+                            // --- Item Qty Totals Row (Aggregated) ---
+                            // REMOVED bg-warning-subtle class
+                            let itemQtyTotalRow = '<tr><td class="fw-bold">TOTAL ITEM QTY (MONTHS)</td>';
+                            
+                            monthKeys.forEach(function(k) {
+                                const val = itemQtyDataCache[k] ? itemQtyDataCache[k].qty : 0;
+                                itemQtyTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
+                            });
+                            
+                            yearlyKeys.forEach(function(yearlyKey) {
+                                const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
+                                const year = keyParts[0];
+                                const type = keyParts[1] || 'total';
+                                
+                                let annualTotal = Object.values(groups).reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
+                                let val = annualTotal;
 
+                                if (type === 'avg') {
+                                    let distinctMonthsSet = {};
+                                    Object.values(groups).forEach(g => {
+                                        Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                                    });
+                                    const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
+                                    val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
+                                }
+                                itemQtyTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
+                            });
+                            
+                            // REMOVED bg-dark text-white class
+                            itemQtyTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandItemQtyTotal)}">${formatQty(grandItemQtyTotal)}</td></tr>`;
+                            tbodyHtml += itemQtyTotalRow;
+
+
+                            // --- Budget Totals Row (Aggregated) ---
                             if (grandBudgetTotal !== 0) {
-                                let budgetRowHtml = '<tr class="bg-primary-subtle"><td class="fw-bold text-nowrap">Budget Allocated (ADDITION)</td>';
-                                let budgetRowTotal = 0;
+                                // REMOVED bg-primary-subtle class
+                                let budgetTotalRow = '<tr><td class="fw-bold text-nowrap">TOTAL BUDGET (MONTHS)</td>';
                                 
                                 monthKeys.forEach(function(k) {
-                                    const val = monthlyBudgetTotals[k] || 0;
-                                    budgetRowTotal += val;
-                                    const cls = val < 0 ? 'text-danger' : '';
-                                    budgetRowHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
+                                    const val = budgetDataCache[k] ? budgetDataCache[k].budget : 0;
+                                    const cls = getColorClass(val);
+                                    budgetTotalRow += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
-
+                                
                                 yearlyKeys.forEach(function(yearlyKey) {
                                     const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
                                     const year = keyParts[0];
@@ -668,67 +898,77 @@ $(function() {
                                     let val = annualTotal;
                                     if (type === 'avg') {
                                         const distinctMonthsCount = (annualBudgetMonthsCount[year] ? Object.keys(annualBudgetMonthsCount[year]).length : 0);
-                                        val = distinctMonthsCount ? Math.round(annualTotal / distinctMonthsCount) : 0;
+                                        val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
                                     }
-                                    
-                                    const cls = val < 0 ? 'text-danger' : '';
-                                    budgetRowHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
+                                    const cls = getColorClass(val);
+                                    budgetTotalRow += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
 
-                                if (!isMonthlyFilterActive && yearlyKeys.length > 0) {
-                                    budgetRowTotal = yearlyKeys.reduce((totalAcc, yk) => {
-                                         const yearOnly = yk.replace('YEARLY-', '').split('|')[0];
-                                         return totalAcc + (annualBudgetTotals[yearOnly] || 0); 
-                                    }, 0);
-                                }
-
-                                budgetRowHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(budgetRowTotal) + '</td></tr>';
-                                tbodyHtml += budgetRowHtml;
+                                // REMOVED bg-dark text-white class
+                                budgetTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandBudgetTotal)}">${formatQty(grandBudgetTotal)}</td></tr>`;
+                                tbodyHtml += budgetTotalRow;
                             }
 
-                            let combinedTotalRow = '<tr class="bg-warning"><td class="fw-bold">Combined Monthly/Annual Total</td>';
+
+                            // Calculate Combined Total Row (Footer)
+                            // REMOVED bg-warning class
+                            let combinedTotalRow = '<tr><td class="fw-bold">Combined Monthly/Annual Total</td>';
                             
                             monthKeys.forEach(function(k) {
                                 const val = monthlyCombinedTotals[k] || 0;
-                                combinedTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(val) + '</td>';
+                                combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
                             });
                             
                             yearlyKeys.forEach(function(k) {
                                 const val = yearlyCombinedTotals[k] || 0;
-                                combinedTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(val) + '</td>';
+                                combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
                             });
                             
-                            combinedTotalRow += '<td class="text-end fw-bold font-monospace bg-dark text-white">' + formatQty(grandCombinedTotal) + '</td></tr>';
+                            // REMOVED bg-secondary text-white class
+                            combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(grandCombinedTotal) + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
                             
-                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
+                            // Added ID for client-side export
+                            const tableHtml = '<table id="detailTable" class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
                             
                             $('#detail-table-container').html(tableHtml);
 
                         } else {
-
+                            // START: Simplified Totals Display (All Time - No Filter)
                             let thead = '<tr><th>Remark / Source</th><th class="text-end">Total Qty</th></tr>';
                             let tbodyHtml = '';
                             
                             Object.keys(groups).forEach(function(remark) {
                                 const g = groups[remark];
-                                const itemCls = g.total < 0 ? 'text-danger' : 'text-success';
+                                const itemCls = getColorClass(g.total);
                                 tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
                                 tbodyHtml += '<td class="text-end fw-bold font-monospace ' + itemCls + '">' + formatQty(g.total) + '</td></tr>';
                             });
 
+                            // NEW FIX: Add Total Item Qty (All Time)
+                            // REMOVED bg-warning-subtle class
+                            const grandItemQtyCls = getColorClass(grandItemQtyTotal);
+                            tbodyHtml += '<tr><td>TOTAL ITEM QTY (All Time)</td>';
+                            tbodyHtml += '<td class="text-end fw-bold font-monospace ' + grandItemQtyCls + '">' + formatQty(grandItemQtyTotal) + '</td></tr>';
+                            
+                            // Budget Row
                             if (grandBudgetTotal !== 0) {
-                                const budgetCls = grandBudgetTotal < 0 ? 'text-danger' : '';
-                                tbodyHtml += '<tr class="bg-primary-subtle"><td>Total Budget Allocated (ADDITION)</td>';
+                                // REMOVED bg-primary-subtle class
+                                const budgetCls = getColorClass(grandBudgetTotal);
+                                tbodyHtml += '<tr><td>Total Budget Allocated (ADDITION)</td>';
                                 tbodyHtml += '<td class="text-end fw-bold font-monospace ' + budgetCls + '">' + formatQty(grandBudgetTotal) + '</td></tr>';
                             }
 
-                            const grandCls = grandCombinedTotal < 0 ? 'text-danger' : 'text-success';
-                            let combinedTotalRow = '<tr class="bg-warning"><td>Combined Grand Total (All Time)</td>';
-                            combinedTotalRow += '<td class="text-end fw-bold font-monospace bg-dark text-white ' + grandCls + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
+                            const grandCls = getColorClass(grandCombinedTotal);
+                            // REMOVED bg-warning class
+                            let combinedTotalRow = '<tr><td>Combined Grand Total (All Time)</td>';
+                            // REMOVED bg-dark text-white class
+                            combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + grandCls + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
 
-                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
+                            // Added ID for client-side export
+                            const tableHtml = '<table id="detailTable" class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
 
                             $('#detail-table-container').html(tableHtml);
+                            // END: Simplified Totals Display
                         }
                     } else {
                         const emptyHtml = '<div class="text-center text-muted p-3">Tidak ada transaksi detail maupun data budget yang ditemukan.</div>';
@@ -736,7 +976,7 @@ $(function() {
                         $('#detail-total-info').text(formatQty(0)).removeClass('text-danger text-success').addClass('text-success');
                     }
                     
-                    $('#detail-total-info').text(formatQty(grandCombinedTotal)).removeClass('text-danger text-success').addClass(grandCombinedTotal < 0 ? 'text-danger' : 'text-success');
+                    $('#detail-total-info').text(formatQty(grandCombinedTotal)).removeClass('text-danger text-success fw-bold').addClass(totalColorClass);
                     
                     $('#detail-loading').hide();
                     $('#detail-content').show();
@@ -752,6 +992,17 @@ $(function() {
                     $('#detail-content').show();
                 }
             });
+        });
+
+        // UPDATED: Download Button Handler now uses client-side export
+        $('#downloadModalDataBtn').on('click', function() {
+            const itemKey = $(this).data('item-key');
+            if (!$('#detailTable').length) {
+                alert('Tidak ada data tabel yang tersedia untuk diunduh.');
+                return;
+            }
+            // Use the client-side function to export the visible table
+            exportTableToCSV('detailTable', itemKey, ';'); 
         });
     }
 

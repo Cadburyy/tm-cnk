@@ -4,7 +4,7 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="text-dark">💰 Data Transaksi Budget</h1>
+        <h1 class="text-dark">💰 Data Master Budget (Resume)</h1>
         <div>
             <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
                 <i class="fas fa-file-upload me-1"></i> Upload Budget CSV
@@ -112,6 +112,11 @@
                                 @endforeach
                             </datalist>
                         </div>
+                        {{-- ADDED: Item Description Filter --}}
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label">Item Description</label>
+                            <input type="text" name="item_description_term" class="form-control form-control-sm" value="{{ $item_description_term ?? '' }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
+                        </div>
                     </div>
                 </div>
 
@@ -149,6 +154,7 @@
                             <thead class="bg-light sticky-top">
                                 <tr>
                                     <th style="width:36px"><input type="checkbox" id="select-all-resume"></th>
+                                    <th class="text-nowrap">Aksi</th> {{-- ADDED: Action Column --}}
                                     <th class="text-nowrap">Item Number</th>
                                     <th class="text-nowrap bg-primary text-white">Item Description</th>
                                     @if (count($months) > 0)
@@ -161,8 +167,24 @@
                             </thead>
                             <tbody>
                                 @foreach($summary_rows as $row)
+                                    @php
+                                        // The 'row_ids' contains all budget IDs contributing to this summary row.
+                                        $firstId = explode(',', $row['row_ids'])[0] ?? null;
+                                    @endphp
                                     <tr>
                                         <td class="select-cell"><input type="checkbox" class="select-resume" name="selected_ids[]" value="{{ $row['row_ids'] ?? '' }}"></td>
+                                        {{-- ADDED: Action Buttons for Admin --}}
+                                        <td class="text-nowrap">
+                                            @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false)) && $firstId)
+                                                <a href="{{ route('budget.edit', $firstId) }}" class="btn btn-sm btn-warning me-1" title="Edit First Record"><i class="fas fa-edit"></i></a>
+                                                {{-- Note: Delete below is destructive and only deletes the first underlying record --}}
+                                                <form action="{{ route('budget.destroy', $firstId) }}" method="POST" class="d-inline delete-form">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="fas fa-trash"></i></button>
+                                                </form>
+                                            @endif
+                                        </td>
                                         <td class="text-nowrap">{{ $row['item_number'] }}</td>
                                         <td style="max-width:300px; background-color: #e7f1ff;">{{ $row['item_description'] }}</td>
                                         @if (count($months) > 0)
@@ -216,7 +238,15 @@
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
+<script>
+// Placeholder for DELETE confirmation
+$(document).on('click', '.delete-btn', function(e) {
+    e.preventDefault();
+    if (confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) {
+        $(this).closest('form').submit();
+    }
+});
+</script>
 <script>
 $(function() {
     const selectedPivot = @json($pivot_months ?? []);
