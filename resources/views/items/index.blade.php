@@ -3,7 +3,7 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="text-dark">📊 Data Transaksi Item</h1>
+        <h1 class="text-dark">📊 Data Transaksi Barang</h1>
         <div>
             <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
                 <i class="fas fa-file-upload me-1"></i> Unggah CSV
@@ -21,7 +21,7 @@
     <form method="GET" action="{{ route('items.index') }}" class="row mb-4" id="filterForm">
         <div class="col-12">
             <div class="card shadow-sm">
-                <div class="card-header bg-light fw-bold">Pilihan Filter Data</div>
+                <div class="card-header bg-light fw-bold">Pilihan Filter Data Barang</div>
                 <div class="card-body">
                     @if ($mode == 'details')
                         <div class="row g-3 mb-2">
@@ -54,7 +54,7 @@
                                 </datalist>
                             </div>
                             <div class="col-lg-2 col-md-4">
-                                <label class="form-label">DEPT</label>
+                                <label class="form-label">Departemen</label>
                                 <input list="depts" name="dept_term" id="dept-input"
                                     class="form-control form-control-sm" value="{{ $dept_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
                                 <datalist id="depts">
@@ -154,7 +154,7 @@
                                 </datalist>
                             </div>
                             <div class="col-lg-6">
-                                <label class="form-label">DEPT</label>
+                                <label class="form-label">Departemen</label>
                                 <input list="depts" name="dept_term" id="dept-input"
                                     class="form-control form-control-sm" value="{{ $dept_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
                                 <datalist id="depts">
@@ -231,7 +231,7 @@
                                         <th>UOM</th>
                                         <th class="text-nowrap">Remarks</th>
                                         <th class="text-nowrap">Item Group</th>
-                                        <th>DEPT</th>
+                                        <th>Departemen</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -273,7 +273,7 @@
                                             @endforeach
                                         @endif
                                         <th class="text-nowrap text-center" style="min-width:90px;">Total Qty</th>
-                                        <th class="text-nowrap">DEPT</th>
+                                        <th class="text-nowrap">Departemen</th>
                                     </tr>
                                 </thead>
                                 <tbody>

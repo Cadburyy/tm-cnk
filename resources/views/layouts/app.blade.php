@@ -301,7 +301,9 @@ $dropdownTextColor  = getTextColor($dropdownBgColor);
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('items.index') }}">Items</a>
                             </li>
-
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('budget.index') }}">Budget</a>
+                            </li>
                             <li class="nav-item dropdown">
                                 <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button"
                                     data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
