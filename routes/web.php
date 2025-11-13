@@ -6,7 +6,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ItemController;
-use App\Http\Controllers\BudgetController; // Import the new BudgetController
+use App\Http\Controllers\BudgetController; 
 use App\Http\Controllers\SettingsController; 
 
 Route::get('/', function () {
@@ -23,15 +23,13 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::middleware(['auth'])->group(function () {
     Route::resource('roles', RoleController::class);
     Route::resource('users', UserController::class);
-    
-    // Transaction Items
-    Route::resource('items', ItemController::class);
+    Route::resource('items', ItemController::class)->only(['index', 'store']);
+    Route::resource('budget', BudgetController::class)->only(['index', 'store']);
+
     Route::get('/items/export-resume-detail', [ItemController::class, 'exportResumeDetail'])->name('items.exportResumeDetail');
     Route::post('/items/export-selected', [ItemController::class, 'exportSelected'])->name('items.exportSelected');
-    
-    // Budget Items (New Resource)
-    Route::resource('budget', BudgetController::class)->only(['index', 'store']);
-    Route::post('/budget/export-selected', [BudgetController::class, 'exportSelected'])->name('budget.exportSelected'); // NEW EXPORT ROUTE
+
+    Route::post('/budget/export-selected', [BudgetController::class, 'exportSelected'])->name('budget.exportSelected');
 });
 
 Route::middleware(['auth', 'role:Admin'])->group(function () {

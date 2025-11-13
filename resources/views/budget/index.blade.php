@@ -4,7 +4,7 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="text-dark">💰 Data Master Budget (Resume)</h1>
+        <h1 class="text-dark">💰 Data Transaksi Budget</h1>
         <div>
             <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
                 <i class="fas fa-file-upload me-1"></i> Upload Budget CSV
@@ -246,7 +246,6 @@ $(function() {
         const yearlyYears = $('.yearly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
         const yearlyMode = $('#yearlyMode').val(); 
         
-        // CRITICAL FIX: Only add yearly pivot if a mode (total or avg) is explicitly selected
         if (yearlyMode && yearlyYears.length > 0) {
             yearlyYears.forEach(function(y) {
                 const val = 'YEARLY-' + y + '|' + yearlyMode;
@@ -272,19 +271,15 @@ $(function() {
         });
     }
 
-    // --- Event Handlers for Pivot Filters ---
-
-    // Yearly Filter Events
     $('.yearly-year-checkbox').on('change', function() {
         updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
         rebuildPivotHiddenInputs();
     });
-    // This is updated to handle the new empty option
+    
     $('#yearlyMode').on('change', function() {
         rebuildPivotHiddenInputs();
     });
 
-    // Monthly Filter Events (Year selection)
     $('.monthly-year-checkbox').on('change', function(){
         updateYearsLabel('.monthly-year-checkbox', '#monthlyYearsLabel');
         syncMonthlyGroupsVisibility();
@@ -292,38 +287,31 @@ $(function() {
         updateMonthsCount();
     });
 
-    // Monthly Filter Events (Month selection)
     $(document).on('change', '.monthly-month-checkbox', function(){
         rebuildPivotHiddenInputs();
         updateMonthsCount();
     });
 
-    // Stop clicks inside dropdown from closing it (UI convenience)
     $('.dropdown-menu').on('click', function (e) {
         e.stopPropagation();
     });
 
-    // CRITICAL FIX: Ensure hidden inputs are finalized before submission
     $filterForm.on('submit', function(e) {
         rebuildPivotHiddenInputs(); 
     });
 
-
-    // Initialization: Sync filter state from server (on page load)
     (function syncFromServerPivot() {
         const yearlyYears = [];
         const monthlyYears = [];
         const monthVals = [];
-        let yearlyMode = ''; // Start with empty mode to reflect '-- Pilih Mode --' default
+        let yearlyMode = '';
 
-        // 1. Determine previously selected filters from PHP variable
         selectedPivot.forEach(function(p) {
             const pStr = String(p);
             if (pStr.startsWith('YEARLY-')) {
                 const parts = pStr.replace('YEARLY-','').split('|');
                 const y = parts[0];
                 yearlyYears.push(y);
-                // Capture the mode from the pivot key
                 if (parts.length > 1) {
                     yearlyMode = parts[1];
                 }
@@ -332,17 +320,14 @@ $(function() {
             }
         });
 
-        // 2. Apply Yearly state to checkboxes/dropdown
         yearlyYears.forEach(function(y) {
             $(`#year_yearly_${y}`).prop('checked', true);
         });
-        // Set the mode dropdown (must happen after setting checked state)
         if ($('#yearlyMode option[value="' + yearlyMode + '"]').length) {
             $('#yearlyMode').val(yearlyMode);
         }
         updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
 
-        // 3. Apply Monthly state to checkboxes and set parent year flags
         monthVals.forEach(function(m){
             const year = m.slice(0,4);
             
@@ -353,24 +338,20 @@ $(function() {
             $(`#month_${m}`).prop('checked', true);
         });
         
-        // Apply the state to the monthly year filters
         monthlyYears.forEach(function(y){
             $(`#year_monthly_${y}`).prop('checked', true);
         });
         updateYearsLabel('.monthly-year-checkbox', '#monthlyYearsLabel');
 
-        // 4. Final synchronization steps
         syncMonthlyGroupsVisibility();
-        rebuildPivotHiddenInputs(); // Regenerate hidden inputs based on checked boxes
+        rebuildPivotHiddenInputs();
         updateMonthsCount();
     })();
 
-    // Select All Checkboxes
     $('#select-all-resume').on('change', function() { 
         $('.select-resume').prop('checked', $(this).is(':checked')); 
     });
 
-    // Export Button Logic
     $('#exportBtn').on('click', function() {
         const selected = $('.select-resume:checked').map(function(){ return $(this).val(); }).get();
         if (selected.length === 0) { 

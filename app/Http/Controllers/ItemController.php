@@ -12,16 +12,18 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        // --- 1. Logika Ajax untuk Detail Pivot Row ---
         if ($request->ajax() && $request->get('action') === 'pivot_row_details') {
             $id_list = $request->get('id_list');
-            if (empty($id_list)) {
-                return response()->json(['details' => []]);
+            $item_key = $request->get('item_key');
+            if (empty($id_list) || empty($item_key)) {
+                return response()->json(['details' => [], 'budget_data' => []]);
             }
             $ids = array_filter(array_map('trim', explode(',', $id_list)));
             if (empty($ids)) {
-                return response()->json(['details' => []]);
+                return response()->json(['details' => [], 'budget_data' => []]);
             }
+            $item_number = explode('||', $item_key)[0] ?? null;
+
             $details = Item::whereIn('id', $ids)
                 ->orderBy('effective_date', 'asc')
                 ->get([
@@ -35,18 +37,28 @@ class ItemController extends Controller
                     'unit_of_measure',
                     'dept'
                 ]);
+
+            $budget_data = [];
+            if ($item_number) {
+                $budgets = \App\Models\Budget::where('item_number', $item_number)
+                    ->get(['effective_date', 'budget']);
+                
+                $budgets->each(function($b) use (&$budget_data) {
+                    $month_year = Carbon::parse($b->effective_date)->format('Y-m');
+                    $budget_data[$month_year] = ($budget_data[$month_year] ?? 0) + $b->budget;
+                });
+            }
+
             $first_item = $details->first();
             $total_qty = $details->sum('loc_qty_change');
             return response()->json([
                 'item_key' => ($first_item) ? $first_item->item_number . '||' . $first_item->item_description . '||' . $first_item->unit_of_measure . '||' . $first_item->dept : 'N/A',
                 'total_qty' => $total_qty,
                 'details' => $details,
+                'budget_data' => $budget_data,
             ]);
         }
         
-        // --- 2. Ambil Data untuk Datalist & Filter (Fix: Undefined Variables) ---
-        
-        // Mengambil data untuk Item Number Datalist
         $itemNumbers = DB::table('items')
             ->select('item_number')
             ->distinct()
@@ -55,7 +67,6 @@ class ItemController extends Controller
             ->orderBy('item_number')
             ->pluck('item_number');
 
-        // Mengambil data untuk Item Group Datalist
         $itemGroups = DB::table('items')
             ->select('item_group')
             ->distinct()
@@ -64,7 +75,6 @@ class ItemController extends Controller
             ->orderBy('item_group')
             ->pluck('item_group');
             
-        // Mengambil data untuk DEPT Datalist
         $depts = DB::table('items')
             ->select('dept')
             ->distinct()
@@ -72,8 +82,6 @@ class ItemController extends Controller
             ->where('dept', '!=', '')
             ->orderBy('dept')
             ->pluck('dept');
-
-        // --- 3. Logika Filter dan Data Utama (Sama seperti sebelumnya) ---
 
         $start_date = $request->input('start_date');
         $end_date = $request->input('end_date');
@@ -225,14 +233,10 @@ class ItemController extends Controller
             }
         }
 
-        // --- 4. Mengembalikan View dengan semua data yang dibutuhkan ---
         return view('items.index', [
-            // Variabel Datalist BARU
             'itemNumbers' => $itemNumbers,
             'itemGroups' => $itemGroups,
             'depts' => $depts,
-
-            // Variabel Utama lainnya (Sama seperti sebelumnya)
             'items' => $items,
             'start_date' => $start_date,
             'end_date' => $end_date,
@@ -249,11 +253,8 @@ class ItemController extends Controller
         ]);
     }
     
-    // ... method store, exportSelected, dan exportResumeDetail lainnya tetap sama
-    
     public function store(Request $request)
     {
-        // ... (kode store tetap sama)
         $request->validate([
             'csv_files' => 'required|array',
             'csv_files.*' => 'mimes:csv,txt|max:10240',
@@ -340,7 +341,6 @@ class ItemController extends Controller
 
     public function exportSelected(Request $request)
     {
-        // ... (kode exportSelected tetap sama)
         $mode = $request->input('mode', 'details');
         $selected = (array) $request->input('selected_ids', []);
         $pivot_months = (array) $request->input('pivot_months', []);
@@ -403,7 +403,6 @@ class ItemController extends Controller
                     $remarksSet = [];
                     $total = 0;
                     
-                    // Only process selected pivot months
                     foreach ($pivot_months as $mkey) {
                         if (str_starts_with($mkey, 'YEARLY-')) {
                             $parts = explode('|', str_replace('YEARLY-', '', $mkey));
@@ -444,7 +443,6 @@ class ItemController extends Controller
                     $out = fopen('php://output', 'w');
                     $header = ['Item Number','Item Description','UOM'];
                     foreach ($pivot_months as $m) {
-                        // Format header label
                         if (str_starts_with($m, 'YEARLY-')) {
                             $parts = explode('|', str_replace('YEARLY-', '', $m));
                             $year = $parts[0];
@@ -494,7 +492,6 @@ class ItemController extends Controller
 
     public function exportResumeDetail(Request $request)
     {
-        // ... (kode exportResumeDetail tetap sama)
         $idLists = $request->input('id_lists');
         $monthsParam = $request->input('months');
 

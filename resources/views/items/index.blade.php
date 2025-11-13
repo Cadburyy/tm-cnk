@@ -181,7 +181,7 @@
                     </button>
                     <a href="{{ route('items.index') }}" class="btn btn-outline-secondary shadow">
                         <i class="fas fa-undo me-1"></i> Reset Filter
-                    </a>
+</a>
                 </div>
             </div>
         </div>
@@ -332,7 +332,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item</h5>
+                    <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item + Budget</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -340,12 +340,12 @@
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <p class="mt-2">Memuat data transaksi...</p>
+                        <p class="mt-2">Memuat data transaksi dan budget...</p>
                     </div>
                     <div id="detail-content" style="display: none;">
                         <p class="fw-bold mb-1">Item:</p>
                         <p class="mb-2 ps-2" id="detail-item-info"></p>
-                        <p class="fw-bold mb-1">Total Kuantitas:</p>
+                        <p class="fw-bold mb-1">Combined Total (Qty + Budget):</p>
                         <p class="mb-3 ps-2 fw-bold" id="detail-total-info"></p>
                         <div class="table-responsive" style="max-height: 50vh;">
                             <div id="detail-table-container"></div>
@@ -391,11 +391,13 @@ $(function() {
         yearlyYears.forEach(function(y) {
             const val = 'YEARLY-' + y + '|' + yearlyMode;
             $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: val}).appendTo('#filterForm');
+            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: val}).appendTo('#exportForm');
         });
 
         const monthly = $('.monthly-month-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
         monthly.forEach(function(ym) {
             $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo('#filterForm');
+            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo('#exportForm');
         });
     }
 
@@ -408,12 +410,9 @@ $(function() {
         });
     }
 
-    // Event handlers for Resume mode
     if (mode === 'resume') {
-        // Keep item_number text inputs uppercase
         $('input[name="item_number_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
 
-        // Yearly Filter Events
         $('.yearly-year-checkbox').on('change', function() {
             updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
             rebuildPivotHiddenInputs();
@@ -421,12 +420,10 @@ $(function() {
         $('#yearlyMode').on('change', function() {
             rebuildPivotHiddenInputs();
         });
-        // Stop clicks inside dropdown from closing it
         $('.dropdown-menu').on('click', function (e) {
             e.stopPropagation();
         });
 
-        // Monthly Filter Events
         $('.monthly-year-checkbox').on('change', function(){
             updateYearsLabel('.monthly-year-checkbox', '#monthlyYearsLabel');
             syncMonthlyGroupsVisibility();
@@ -439,7 +436,6 @@ $(function() {
             updateMonthsCount();
         });
 
-        // Initialization for Resume mode
         function syncFromServerPivot() {
             const yearlyYears = [];
             const monthlyYears = [];
@@ -459,14 +455,12 @@ $(function() {
                 }
             });
 
-            // Set Yearly years and mode
             yearlyYears.forEach(function(y) {
                 $('#year_yearly_' + y).prop('checked', true);
             });
             $('#yearlyMode').val(yearlyMode);
             updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
 
-            // Set Monthly months
             monthVals.forEach(function(m){
                 const year = m.slice(0,4);
                 if (monthlyYears.indexOf(year) === -1) {
@@ -479,18 +473,29 @@ $(function() {
             });
             updateYearsLabel('.monthly-year-checkbox', '#monthlyYearsLabel');
 
-            // Sync visibility and rebuild inputs
             syncMonthlyGroupsVisibility();
             rebuildPivotHiddenInputs();
             updateMonthsCount();
         }
         syncFromServerPivot();
 
-        // Resume Detail Modal Logic
         const $detailModal = $('#pivotDetailModal');
         const currentUrl = '{{ route('items.index') }}';
         const pivotMonths = @json($months ?? []);
-        function formatQty(qty) { const n = parseInt(qty) || 0; return n.toLocaleString('id-ID'); }
+        
+        function formatQty(qty) { 
+            const n = parseInt(qty) || 0; 
+            return n.toLocaleString('id-ID'); 
+        }
+
+        function escapeHtml(unsafe) { 
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;"); 
+        }
         
         $(document).on('click', '.resume-row-clickable td:not(.select-cell)', function(event) {
             const $row = $(this).closest('.resume-row-clickable');
@@ -521,8 +526,11 @@ $(function() {
                     const monthLabels = displayLabels.filter(function(_, i){ return !displayKeys[i].startsWith('YEARLY-'); });
                     const yearlyKeys = displayKeys.filter(function(k){ return k.startsWith('YEARLY-'); });
                     const yearlyLabels = displayLabels.filter(function(_, i){ return displayKeys[i].startsWith('YEARLY-'); });
+                    
+                    const isMonthlyFilterActive = monthKeys.length > 0;
+                    
                     const groups = {};
-                    let grandTotal = 0;
+                    let grandItemQtyTotal = 0;
                     
                     if (Array.isArray(response.details) && response.details.length > 0) {
                         response.details.forEach(function(detail) {
@@ -536,26 +544,86 @@ $(function() {
                             groups[remark].annual_months_set[year] = groups[remark].annual_months_set[year] || {};
                             if (mkey) groups[remark].annual_months_set[year][mkey] = true;
                             groups[remark].total += qty;
-                            grandTotal += qty;
+                            grandItemQtyTotal += qty;
                         });
+                    }
+
+                    const budgetByMonth = response.budget_data || {};
+                    let grandBudgetTotal = 0;
+                    let monthlyBudgetTotals = {};
+                    let monthlyCombinedTotals = {};
+                    let yearlyCombinedTotals = {};
+                    let annualBudgetTotals = {};
+                    let annualBudgetMonthsCount = {};
+                    
+                    Object.keys(budgetByMonth).forEach(function(mkey) {
+                        const budgetVal = parseFloat(budgetByMonth[mkey]) || 0;
+                        grandBudgetTotal += budgetVal;
+                        monthlyBudgetTotals[mkey] = budgetVal;
                         
-                        if (monthKeys.length > 0 || yearlyKeys.length > 0) {
-                            let thead = '<tr><th>Remark</th>';
+                        const year = mkey.slice(0, 4);
+                        annualBudgetTotals[year] = (annualBudgetTotals[year] || 0) + budgetVal;
+                        annualBudgetMonthsCount[year] = annualBudgetMonthsCount[year] || {};
+                        annualBudgetMonthsCount[year][mkey] = true;
+                    });
+                    
+                    const grandCombinedTotal = grandItemQtyTotal + grandBudgetTotal;
+
+                    monthKeys.forEach(function(k) {
+                        const itemVal = Object.values(groups).reduce((acc, g) => acc + (g.months[k] || 0), 0);
+                        const budgetVal = monthlyBudgetTotals[k] || 0;
+                        monthlyCombinedTotals[k] = itemVal + budgetVal;
+                    });
+
+                    yearlyKeys.forEach(function(yearlyKey) {
+                        const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
+                        const year = keyParts[0];
+                        const type = keyParts[1] || 'total';
+                        
+                        let totalItemForYear = 0;
+                        Object.values(groups).forEach(g => {
+                            totalItemForYear += (g.annual_totals[year] || 0);
+                        });
+
+                        let totalBudgetForYear = annualBudgetTotals[year] || 0;
+
+                        let totalVal = totalItemForYear + totalBudgetForYear;
+                        
+                        if (type === 'avg') {
+                            let distinctMonthsSet = {};
+                            Object.values(groups).forEach(g => {
+                                Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                            });
+                            Object.keys(annualBudgetMonthsCount[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                            
+                            const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
+                            totalVal = distinctMonthsCount ? Math.round(totalVal / distinctMonthsCount) : 0;
+                        }
+                        yearlyCombinedTotals[yearlyKey] = totalVal;
+                    });
+
+                    if (grandItemQtyTotal !== 0 || grandBudgetTotal !== 0) {
+
+                        const isAnyFilterActive = monthKeys.length > 0 || yearlyKeys.length > 0;
+
+                        if (isAnyFilterActive) {
+                            let thead = '<tr><th>Remark / Source</th>';
                             monthLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
                             yearlyLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + label + '</th>'; });
                             thead += '<th class="text-end">Total</th></tr>';
                             let tbodyHtml = '';
-                            let monthlyTotalsByKey = {};
-                            
+
                             Object.keys(groups).forEach(function(remark) {
                                 const g = groups[remark];
-                                tbodyHtml += '<tr><td style="min-width:220px;">' + escapeHtml(remark) + '</td>';
+                                tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
+                                let rowTotal = 0;
                                 monthKeys.forEach(function(k) {
                                     const val = g.months[k] || 0;
-                                    monthlyTotalsByKey[k] = (monthlyTotalsByKey[k] || 0) + val;
+                                    rowTotal += val;
                                     const cls = val < 0 ? 'text-danger' : 'text-success';
                                     tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
+
                                 yearlyKeys.forEach(function(yearlyKey) {
                                     const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
                                     const year = keyParts[0];
@@ -566,43 +634,120 @@ $(function() {
                                         const distinctMonthsCount = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
                                         val = distinctMonthsCount ? Math.round(annualTotal / distinctMonthsCount) : 0;
                                     }
+                                    
                                     const cls = val < 0 ? 'text-danger' : 'text-success';
                                     tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
                                 });
-                                tbodyHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(g.total) + '</td></tr>';
+
+                                if (!isMonthlyFilterActive && yearlyKeys.length > 0) {
+                                    rowTotal = yearlyKeys.reduce((totalAcc, yk) => {
+                                         const yearOnly = yk.replace('YEARLY-', '').split('|')[0];
+                                         return totalAcc + (g.annual_totals[yearOnly] || 0); 
+                                    }, 0);
+                                }
+                                
+                                tbodyHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(rowTotal) + '</td></tr>';
+                            });
+
+                            if (grandBudgetTotal !== 0) {
+                                let budgetRowHtml = '<tr class="bg-primary-subtle"><td class="fw-bold text-nowrap">Budget Allocated (ADDITION)</td>';
+                                let budgetRowTotal = 0;
+                                
+                                monthKeys.forEach(function(k) {
+                                    const val = monthlyBudgetTotals[k] || 0;
+                                    budgetRowTotal += val;
+                                    const cls = val < 0 ? 'text-danger' : '';
+                                    budgetRowHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
+                                });
+
+                                yearlyKeys.forEach(function(yearlyKey) {
+                                    const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
+                                    const year = keyParts[0];
+                                    const type = keyParts[1] || 'total';
+                                    const annualTotal = annualBudgetTotals[year] || 0;
+                                    let val = annualTotal;
+                                    if (type === 'avg') {
+                                        const distinctMonthsCount = (annualBudgetMonthsCount[year] ? Object.keys(annualBudgetMonthsCount[year]).length : 0);
+                                        val = distinctMonthsCount ? Math.round(annualTotal / distinctMonthsCount) : 0;
+                                    }
+                                    
+                                    const cls = val < 0 ? 'text-danger' : '';
+                                    budgetRowHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
+                                });
+
+                                if (!isMonthlyFilterActive && yearlyKeys.length > 0) {
+                                    budgetRowTotal = yearlyKeys.reduce((totalAcc, yk) => {
+                                         const yearOnly = yk.replace('YEARLY-', '').split('|')[0];
+                                         return totalAcc + (annualBudgetTotals[yearOnly] || 0); 
+                                    }, 0);
+                                }
+
+                                budgetRowHtml += '<td class="text-end fw-bold font-monospace bg-light">' + formatQty(budgetRowTotal) + '</td></tr>';
+                                tbodyHtml += budgetRowHtml;
+                            }
+
+                            let combinedTotalRow = '<tr class="bg-warning"><td class="fw-bold">Combined Monthly/Annual Total</td>';
+                            
+                            monthKeys.forEach(function(k) {
+                                const val = monthlyCombinedTotals[k] || 0;
+                                combinedTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(val) + '</td>';
                             });
                             
-                            let monthlyTotalRow = '<tr class="bg-warning"><td class="fw-bold">Monthly Total</td>';
-                            monthKeys.forEach(function(k) {
-                                monthlyTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(monthlyTotalsByKey[k] || 0) + '</td>';
+                            yearlyKeys.forEach(function(k) {
+                                const val = yearlyCombinedTotals[k] || 0;
+                                combinedTotalRow += '<td class="text-end fw-bold font-monospace">' + formatQty(val) + '</td>';
                             });
-                            monthlyTotalRow += '<td colspan="' + (yearlyKeys.length + 1) + '"></td></tr>';
-                            const colspan = 1 + monthKeys.length + yearlyKeys.length;
-                            const tfoot = '<tr><td colspan="' + colspan + '" class="text-end fw-bold">Grand total</td><td class="text-end fw-bold font-monospace bg-secondary text-white">' + formatQty(grandTotal) + '</td></tr>';
-                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + monthlyTotalRow + '</tbody><tfoot>' + tfoot + '</tfoot></table>';
+                            
+                            combinedTotalRow += '<td class="text-end fw-bold font-monospace bg-dark text-white">' + formatQty(grandCombinedTotal) + '</td></tr>';
+                            
+                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
+                            
                             $('#detail-table-container').html(tableHtml);
+
                         } else {
+
+                            let thead = '<tr><th>Remark / Source</th><th class="text-end">Total Qty</th></tr>';
                             let tbodyHtml = '';
+                            
                             Object.keys(groups).forEach(function(remark) {
                                 const g = groups[remark];
-                                tbodyHtml += '<tr><td style="min-width:220px;">' + escapeHtml(remark) + '</td><td class="text-end fw-bold font-monospace bg-light">' + formatQty(g.total) + '</td></tr>';
+                                const itemCls = g.total < 0 ? 'text-danger' : 'text-success';
+                                tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
+                                tbodyHtml += '<td class="text-end fw-bold font-monospace ' + itemCls + '">' + formatQty(g.total) + '</td></tr>';
                             });
-                            const tfoot = '<tr><td class="text-end fw-bold">Grand total</td><td class="text-end fw-bold font-monospace bg-secondary text-white">' + formatQty(grandTotal) + '</td></tr>';
-                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light"><tr><th>Remark</th><th class="text-end">Total</th></tr></thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + tfoot + '</tfoot></table>';
+
+                            if (grandBudgetTotal !== 0) {
+                                const budgetCls = grandBudgetTotal < 0 ? 'text-danger' : '';
+                                tbodyHtml += '<tr class="bg-primary-subtle"><td>Total Budget Allocated (ADDITION)</td>';
+                                tbodyHtml += '<td class="text-end fw-bold font-monospace ' + budgetCls + '">' + formatQty(grandBudgetTotal) + '</td></tr>';
+                            }
+
+                            const grandCls = grandCombinedTotal < 0 ? 'text-danger' : 'text-success';
+                            let combinedTotalRow = '<tr class="bg-warning"><td>Combined Grand Total (All Time)</td>';
+                            combinedTotalRow += '<td class="text-end fw-bold font-monospace bg-dark text-white ' + grandCls + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
+
+                            const tableHtml = '<table class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
+
                             $('#detail-table-container').html(tableHtml);
                         }
-                        
-                        $('#detail-total-info').text(formatQty(grandTotal)).removeClass('text-danger text-success').addClass(grandTotal < 0 ? 'text-danger' : 'text-success');
                     } else {
-                        const emptyHtml = '<div class="text-center text-muted p-3">Tidak ada transaksi detail yang ditemukan.</div>';
+                        const emptyHtml = '<div class="text-center text-muted p-3">Tidak ada transaksi detail maupun data budget yang ditemukan.</div>';
                         $('#detail-table-container').html(emptyHtml);
                         $('#detail-total-info').text(formatQty(0)).removeClass('text-danger text-success').addClass('text-success');
                     }
+                    
+                    $('#detail-total-info').text(formatQty(grandCombinedTotal)).removeClass('text-danger text-success').addClass(grandCombinedTotal < 0 ? 'text-danger' : 'text-success');
+                    
                     $('#detail-loading').hide();
                     $('#detail-content').show();
                 },
-                error: function() {
-                    $('#detail-table-container').html('<div class="text-center text-danger p-3">Gagal memuat data detail.</div>');
+                error: function(xhr, status, error) {
+                    let errorMessage = 'Gagal memuat data detail. Cek log server untuk detail.';
+                    try {
+                        const err = JSON.parse(xhr.responseText);
+                        errorMessage = err.error || errorMessage;
+                    } catch (e) {}
+                    $('#detail-table-container').html('<div class="text-center text-danger p-3">' + errorMessage + '</div>');
                     $('#detail-loading').hide();
                     $('#detail-content').show();
                 }
@@ -610,12 +755,10 @@ $(function() {
         });
     }
 
-    // Select All Checkboxes
     $('#select-all-details').on('change', function() { $('.select-detail').prop('checked', $(this).is(':checked')); });
     $('#select-all-resume').on('change', function() { $('.select-resume').prop('checked', $(this).is(':checked')); });
     $(document).on('click', '.select-resume', function(e) { e.stopPropagation(); });
 
-    // Export Button Logic
     $('#exportBtn').on('click', function() {
         if (mode === 'details') {
             const selected = $('.select-detail:checked').map(function(){ return $(this).val(); }).get();
@@ -633,8 +776,6 @@ $(function() {
             window.location.href = '{{ route('items.exportResumeDetail') }}?' + $.param(params);
         }
     });
-
-    function escapeHtml(unsafe) { return String(unsafe).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 });
 </script>
 @endsection
