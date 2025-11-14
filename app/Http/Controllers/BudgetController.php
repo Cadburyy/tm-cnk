@@ -168,6 +168,7 @@ class BudgetController extends Controller
         $uploadCount = 0;
         $allData = [];
         $errors = [];
+        $batchData = [];
 
         DB::beginTransaction();
         try {
@@ -227,6 +228,7 @@ class BudgetController extends Controller
                 
                 if (!empty($batchData)) {
                     $allData = array_merge($allData, $batchData);
+                    $batchData = [];
                 }
             }
 
@@ -248,151 +250,59 @@ class BudgetController extends Controller
         }
     }
 
-    public function exportSelected(Request $request)
+    public function bulkDestroy(Request $request)
     {
-        $selected = (array) $request->input('selected_ids', []);
-        $pivot_months_keys = (array) $request->input('pivot_months', []);
-
-        if (empty($selected)) {
-            return back()->with('error', 'No rows selected for export.');
-        }
-
-        try {
-            ini_set('memory_limit', '512M');
-            set_time_limit(300);
-
-            $rows = [];
-            foreach ($selected as $row_ids_str) {
-                if (trim($row_ids_str) === '') continue;
-                $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
-                if (empty($ids)) continue;
-
-                $items = Budget::whereIn('id', $ids)->get();
-                if ($items->isEmpty()) continue;
-                
-                $first = $items->first();
-                $rowData = [
-                    'item_number' => $first->item_number,
-                    'item_description' => $first->item_description,
-                ];
-                $total = 0;
-                
-                $annual_totals = [];
-                $annual_months_count = [];
-
-                foreach ($items as $it) {
-                    $month_year = Carbon::parse($it->effective_date)->format('Y-m');
-                    $year = Carbon::parse($it->effective_date)->format('Y');
-                    $budget_val = (float) $it->budget;
-
-                    $rowData[$month_year] = ($rowData[$month_year] ?? 0) + $budget_val;
-                    $annual_totals[$year] = ($annual_totals[$year] ?? 0) + $budget_val;
-                    $annual_months_count[$year][$month_year] = true;
-                }
-                
-                foreach ($pivot_months_keys as $mkey) {
-                    if (str_starts_with($mkey, 'YEARLY-')) {
-                        $parts = explode('|', str_replace('YEARLY-', '', $mkey));
-                        $year = $parts[0];
-                        $type = $parts[1] ?? 'total';
-                        
-                        $annual_total = $annual_totals[$year] ?? 0;
-                        
-                        if ($type === 'avg') {
-                            $distinct_months = count($annual_months_count[$year] ?? []);
-                            $val = $distinct_months ? ($annual_total / $distinct_months) : 0;
-                        } else {
-                            $val = $annual_total;
-                        }
-                        $rowData[$mkey] = $val;
-                    } else {
-                        $val = $rowData[$mkey] ?? 0;
-                        $rowData[$mkey] = $val;
-                        $total += $val;
-                    }
-                }
-                $rowData['total'] = $total;
-                $rows[] = $rowData;
-            }
-            
-            $filename = 'budget_resume_' . now()->format('Ymd_His') . '.csv';
-            $response = new StreamedResponse(function() use ($rows, $pivot_months_keys) {
-                $out = fopen('php://output', 'w');
-                $header = ['Item Number','Item Description'];
-                
-                foreach ($pivot_months_keys as $m) {
-                    if (str_starts_with($m, 'YEARLY-')) {
-                        $parts = explode('|', str_replace('YEARLY-', '', $m));
-                        $year = $parts[0];
-                        $type = $parts[1] ?? 'total';
-                        $label = ($type === 'avg') ? "Avg $year" : "Total $year";
-                        $header[] = $label;
-                    } else {
-                        try {
-                            $date = Carbon::createFromFormat('Y-m', $m);
-                            $header[] = $date->format('M y');
-                        } catch (\Exception $e) {
-                            $header[] = $m;
-                        }
-                    }
-                }
-                $header[] = 'Total Budget';
-                fputcsv($out, $header);
-                
-                foreach ($rows as $r) {
-                    $line = [$r['item_number'] ?? '', $r['item_description'] ?? ''];
-                    foreach ($pivot_months_keys as $m) {
-                        $line[] = $r[$m] ?? 0;
-                    }
-                    $line[] = $r['total'] ?? 0;
-                    fputcsv($out, $line);
-                }
-                fclose($out);
-            });
-            $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-            $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-            return $response;
-
-        } catch (\Throwable $e) {
-            \Log::error('Budget Export Selected error: ' . $e->getMessage(), ['exception' => $e]);
-            return back()->with('error', 'Export failed: ' . $e->getMessage());
-        }
-    }
-    
-    // ADDED ADMIN METHOD: DELETE
-    public function destroy($id)
-    {
-        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
             return back()->with('error', 'Unauthorized access.');
         }
-        // Assuming deletion is for a single transaction/budget row by ID
-        $deleted = Budget::destroy($id);
-        if ($deleted) {
-            return back()->with('success', 'Budget record deleted successfully.');
+
+        $selected = (array) $request->input('selected_ids', []);
+        
+        if (empty($selected)) {
+            return back()->with('error', 'No budget items selected for deletion.');
         }
-        return back()->with('error', 'Failed to delete record.');
+
+        $all_ids_to_delete = [];
+        foreach ($selected as $row_ids_str) {
+            $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
+            $all_ids_to_delete = array_merge($all_ids_to_delete, $ids);
+        }
+        $all_ids_to_delete = array_unique($all_ids_to_delete);
+        
+        DB::beginTransaction();
+        try {
+            $deletedCount = Budget::whereIn('id', $all_ids_to_delete)->delete();
+            DB::commit();
+            
+            if ($deletedCount > 0) {
+                return back()->with('success', "Successfully deleted {$deletedCount} records across " . count($selected) . " budget item summaries.");
+            }
+            return back()->with('error', 'Failed to delete any selected records.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Budget Bulk Delete Failed: ' . $e->getMessage(), ['exception' => $e]);
+            return back()->with('error', 'Bulk deletion failed: ' . $e->getMessage());
+        }
     }
     
-    // ADDED ADMIN METHOD: EDIT (Placeholder)
     public function edit($id)
     {
-        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
              return redirect()->route('budget.index')->with('error', 'Unauthorized access.');
         }
         $budget = Budget::findOrFail($id);
-        return view('budget.edit', compact('budget')); // Assuming you have a budget.edit view
+        return view('budget.edit', compact('budget'));
     }
     
-    // ADDED ADMIN METHOD: UPDATE (Placeholder)
     public function update(Request $request, $id)
     {
-         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
              return redirect()->route('budget.index')->with('error', 'Unauthorized access.');
          }
          $request->validate([
              'item_number' => 'required',
              'budget' => 'required|numeric',
-             // Add other validation rules as needed
          ]);
          
          $budget = Budget::findOrFail($id);
@@ -400,4 +310,4 @@ class BudgetController extends Controller
          
          return redirect()->route('budget.index')->with('success', 'Budget record updated successfully.');
     }
-}   
+}

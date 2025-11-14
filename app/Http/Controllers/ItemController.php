@@ -87,7 +87,7 @@ class ItemController extends Controller
         $end_date = $request->input('end_date');
         $raw_selections = $request->input('pivot_months', []);
         $mode = $request->input('mode', 'resume');
-        if ($mode === 'details' && (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false)))) {
+        if ($mode === 'details' && (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)))) {
             $mode = 'resume';
         }
         $item_number_term = $request->input('item_number_term');
@@ -106,8 +106,8 @@ class ItemController extends Controller
         });
 
         $query = Item::query();
-        $query->orderBy('effective_date', 'desc');
         $query->orderBy('item_number', 'asc');
+        $query->orderBy('effective_date', 'desc');
 
         if ($mode == 'details' && $start_date && $end_date) {
             $query->whereBetween('effective_date', [$start_date, $end_date]);
@@ -339,157 +339,6 @@ class ItemController extends Controller
         }
     }
 
-    public function exportSelected(Request $request)
-    {
-        $mode = $request->input('mode', 'details');
-        $selected = (array) $request->input('selected_ids', []);
-        $pivot_months = (array) $request->input('pivot_months', []);
-
-        if (empty($selected)) {
-            return back()->with('error', 'No rows selected for export.');
-        }
-
-        try {
-            ini_set('memory_limit', '512M');
-            set_time_limit(300);
-
-            if ($mode === 'details') {
-                $ids = array_filter($selected);
-                $items = Item::whereIn('id', $ids)->orderBy('effective_date', 'asc')->get();
-                $filename = 'items_details_' . now()->format('Ymd_His') . '.csv';
-                $response = new StreamedResponse(function() use ($items) {
-                    $out = fopen('php://output', 'w');
-                    fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
-                    foreach ($items as $it) {
-                        try {
-                            $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
-                        } catch (\Exception $e) {
-                            $effective = $it->effective_date;
-                        }
-                        fputcsv($out, [
-                            $it->item_number,
-                            $it->item_description,
-                            $effective,
-                            $it->bulan,
-                            $it->loc_qty_change,
-                            $it->unit_of_measure,
-                            $it->remarks,
-                            $it->item_group,
-                            $it->dept,
-                        ]);
-                    }
-                    fclose($out);
-                });
-                $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-                $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-                return $response;
-            }
-
-            if ($mode === 'resume') {
-                $rows = [];
-                foreach ($selected as $row_ids_str) {
-                    if (trim($row_ids_str) === '') continue;
-                    $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
-                    if (empty($ids)) continue;
-                    $items = Item::whereIn('id', $ids)->get();
-                    if ($items->isEmpty()) continue;
-                    $first = $items->first();
-                    $rowData = [
-                        'item_number' => $first->item_number,
-                        'item_description' => $first->item_description,
-                        'unit_of_measure' => $first->unit_of_measure,
-                        'dept' => $first->dept,
-                    ];
-                    $remarksSet = [];
-                    $total = 0;
-                    
-                    foreach ($pivot_months as $mkey) {
-                        if (str_starts_with($mkey, 'YEARLY-')) {
-                            $parts = explode('|', str_replace('YEARLY-', '', $mkey));
-                            $year = $parts[0];
-                            $type = $parts[1] ?? 'total';
-                            $yearItems = $items->filter(function($it) use ($year) {
-                                return Carbon::parse($it->effective_date)->format('Y') === $year;
-                            });
-                            $annual_totals = $yearItems->sum('loc_qty_change');
-                            if ($type === 'avg') {
-                                $distinct_months = $yearItems->groupBy(function($it) {
-                                    return Carbon::parse($it->effective_date)->format('Y-m');
-                                })->count();
-                                $val = $distinct_months ? ($annual_totals / $distinct_months) : 0;
-                            } else {
-                                $val = $annual_totals;
-                            }
-                            $rowData[$mkey] = $val;
-                        } else {
-                            $val = $items->filter(function($it) use ($mkey) {
-                                return Carbon::parse($it->effective_date)->format('Y-m') === $mkey;
-                            })->sum('loc_qty_change');
-                            $rowData[$mkey] = $val;
-                            $total += $val;
-                        }
-                        foreach ($items as $it) {
-                            $r = trim((string)$it->remarks);
-                            if ($r !== '') $remarksSet[$r] = true;
-                        }
-                    }
-                    $rowData['total'] = $total;
-                    $rowData['remarks'] = implode(' | ', array_keys($remarksSet));
-                    $rows[] = $rowData;
-                }
-                
-                $filename = 'items_resume_' . now()->format('Ymd_His') . '.csv';
-                $response = new StreamedResponse(function() use ($rows, $pivot_months) {
-                    $out = fopen('php://output', 'w');
-                    $header = ['Item Number','Item Description','UOM'];
-                    foreach ($pivot_months as $m) {
-                        if (str_starts_with($m, 'YEARLY-')) {
-                            $parts = explode('|', str_replace('YEARLY-', '', $m));
-                            $year = $parts[0];
-                            $type = $parts[1] ?? 'total';
-                            $label = ($type === 'avg') ? "Avg $year" : "Total $year";
-                            $header[] = $label;
-                        } else {
-                            try {
-                                $date = Carbon::createFromFormat('Y-m', $m);
-                                $header[] = $date->format('M y');
-                            } catch (\Exception $e) {
-                                $header[] = $m;
-                            }
-                        }
-                    }
-                    $header[] = 'Total Qty';
-                    $header[] = 'Remarks';
-                    $header[] = 'DEPT';
-                    fputcsv($out, $header);
-                    
-                    foreach ($rows as $r) {
-                        $line = [$r['item_number'] ?? '', $r['item_description'] ?? '', $r['unit_of_measure'] ?? ''];
-                        foreach ($pivot_months as $m) {
-                            $line[] = $r[$m] ?? 0;
-                        }
-                        $line[] = $r['total'] ?? 0;
-                        $line[] = $r['remarks'] ?? '';
-                        $line[] = $r['dept'] ?? '';
-                        fputcsv($out, $line);
-                    }
-                    fclose($out);
-                });
-                $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-                $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-                return $response;
-            }
-
-            return back()->with('error', 'Invalid export mode.');
-        } catch (\Throwable $e) {
-            \Log::error('ExportSelected error: ' . $e->getMessage(), ['exception' => $e]);
-            if ($request->ajax()) {
-                return response()->json(['error' => 'Export failed. Check logs.'], 500);
-            }
-            return back()->with('error', 'Export failed. Check logs.');
-        }
-    }
-
     public function exportResumeDetail(Request $request)
     {
         $idLists = $request->input('id_lists');
@@ -516,85 +365,106 @@ class ItemController extends Controller
             return back()->with('error', 'No data found');
         }
 
-        $months = !empty($monthsParam) ? explode(',', $monthsParam) : [];
-
-        try {
-            ini_set('memory_limit', '512M');
-            set_time_limit(300);
-
-            $filename = 'bulk_detail_transaksi_' . now()->format('Ymd_His') . '.csv';
-            $response = new StreamedResponse(function() use ($items, $months) {
-                $out = fopen('php://output', 'w');
-                fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
-                foreach ($items as $it) {
-                    try {
-                        $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
-                    } catch (\Exception $e) {
-                        $effective = $it->effective_date;
-                    }
-                    fputcsv($out, [
-                        $it->item_number,
-                        $it->item_description,
-                        $effective,
-                        $it->bulan,
-                        intval($it->loc_qty_change),
-                        $it->unit_of_measure,
-                        $it->remarks,
-                        $it->item_group,
-                        $it->dept,
-                    ]);
+        $filename = 'bulk_detail_transaksi_' . now()->format('Ymd_His') . '.csv';
+        $response = new StreamedResponse(function() use ($items, $monthsParam) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
+            foreach ($items as $it) {
+                try {
+                    $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
+                } catch (\Exception $e) {
+                    $effective = $it->effective_date;
                 }
-                fclose($out);
-            });
+                fputcsv($out, [
+                    $it->item_number,
+                    $it->item_description,
+                    $effective,
+                    $it->bulan,
+                    intval($it->loc_qty_change),
+                    $it->unit_of_measure,
+                    $it->remarks,
+                    $it->item_group,
+                    $it->dept,
+                ]);
+            }
+            fclose($out);
+        });
 
-            $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-            $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-            return $response;
-        } catch (\Throwable $e) {
-            \Log::error('ExportResumeDetail error: ' . $e->getMessage(), ['exception' => $e]);
-            return back()->with('error', 'Export failed. Check logs.');
-        }
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        return $response;
     }
     
-    // ADDED ADMIN METHOD: DELETE
     public function destroy($id)
     {
-        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
             return back()->with('error', 'Unauthorized access.');
         }
-        // Delete by single ID (used in Details mode)
         $deleted = Item::destroy($id);
         if ($deleted) {
             return back()->with('success', 'Item transaction deleted successfully.');
         }
         return back()->with('error', 'Failed to delete record.');
     }
+
+    public function bulkDestroy(Request $request)
+    {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
+            return back()->with('error', 'Unauthorized access for bulk delete.');
+        }
+
+        $selected = (array) $request->input('selected_ids', []);
+        
+        if (empty($selected)) {
+            return back()->with('error', 'No items selected for deletion.');
+        }
+
+        $all_ids_to_delete = [];
+        foreach ($selected as $row_ids_str) {
+            $ids = array_filter(array_map('trim', explode(',', $row_ids_str)));
+            $all_ids_to_delete = array_merge($all_ids_to_delete, $ids);
+        }
+        $all_ids_to_delete = array_unique($all_ids_to_delete);
+        
+        DB::beginTransaction();
+        try {
+            $deletedCount = Item::whereIn('id', $all_ids_to_delete)->delete();
+            DB::commit();
+            
+            if ($deletedCount > 0) {
+                return back()->with('success', "Successfully deleted {$deletedCount} records across " . count($all_ids_to_delete) . " items.");
+            }
+            return back()->with('error', 'Failed to delete any selected records.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Item Bulk Delete Failed: ' . $e->getMessage(), ['exception' => $e]);
+            return back()->with('error', 'Bulk deletion failed: ' . $e->getMessage());
+        }
+    }
     
-    // ADDED ADMIN METHOD: EDIT (Placeholder)
     public function edit($id)
     {
-        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
              return redirect()->route('items.index')->with('error', 'Unauthorized access.');
         }
         $item = Item::findOrFail($id);
-        return view('items.edit', compact('item')); // Assuming an items.edit view exists
+        return view('items.edit', compact('item'));
     }
     
-    // ADDED ADMIN METHOD: UPDATE (Placeholder)
     public function update(Request $request, $id)
     {
-         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false))) {
+        if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
              return redirect()->route('items.index')->with('error', 'Unauthorized access.');
-         }
-         $request->validate([
+        }
+        $request->validate([
              'item_number' => 'required',
              'loc_qty_change' => 'required|numeric',
-             // Add other validation rules as needed
-         ]);
-         
-         $item = Item::findOrFail($id);
-         $item->update($request->all());
-         
-         return redirect()->route('items.index')->with('success', 'Item transaction updated successfully.');
+        ]);
+        
+        $item = Item::findOrFail($id);
+        $item->update($request->all());
+        
+        return redirect()->route('items.index')->with('success', 'Item transaction updated successfully.');
     }
 }

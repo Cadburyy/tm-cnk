@@ -112,7 +112,6 @@
                                 @endforeach
                             </datalist>
                         </div>
-                        {{-- ADDED: Item Description Filter --}}
                         <div class="col-lg-3 col-md-6">
                             <label class="form-label">Item Description</label>
                             <input type="text" name="item_description_term" class="form-control form-control-sm" value="{{ $item_description_term ?? '' }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
@@ -121,9 +120,11 @@
                 </div>
 
                 <div class="card-footer d-flex justify-content-end gap-2">
-                    <button type="button" id="exportBtn" class="btn btn-outline-primary">
-                        <i class="fas fa-download me-1"></i> Download Selected CSV
-                    </button>
+                    @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)))
+                        <button type="button" id="bulkDeleteBtn" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-1"></i> Bulk Delete Selected
+                        </button>
+                    @endif
 
                     <div id="pivotHiddenInputsContainer" style="display: none;">
                     </div>
@@ -139,7 +140,7 @@
         </div>
     </form>
 
-    <form id="exportForm" method="POST" action="{{ route('budget.exportSelected') }}">
+    <form id="bulkDeleteForm" method="POST" action="{{ route('budget.bulkDestroy') }}">
         @csrf
         <div class="card shadow-lg">
             <div class="card-header bg-info text-black fw-bold">
@@ -154,7 +155,7 @@
                             <thead class="bg-light sticky-top">
                                 <tr>
                                     <th style="width:36px"><input type="checkbox" id="select-all-resume"></th>
-                                    <th class="text-nowrap">Aksi</th> {{-- ADDED: Action Column --}}
+                                    <th class="text-nowrap text-center">Aksi</th>
                                     <th class="text-nowrap">Item Number</th>
                                     <th class="text-nowrap bg-primary text-white">Item Description</th>
                                     @if (count($months) > 0)
@@ -168,21 +169,13 @@
                             <tbody>
                                 @foreach($summary_rows as $row)
                                     @php
-                                        // The 'row_ids' contains all budget IDs contributing to this summary row.
                                         $firstId = explode(',', $row['row_ids'])[0] ?? null;
                                     @endphp
                                     <tr>
                                         <td class="select-cell"><input type="checkbox" class="select-resume" name="selected_ids[]" value="{{ $row['row_ids'] ?? '' }}"></td>
-                                        {{-- ADDED: Action Buttons for Admin --}}
-                                        <td class="text-nowrap">
+                                        <td class="text-nowrap text-center">
                                             @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)) && $firstId)
                                                 <a href="{{ route('budget.edit', $firstId) }}" class="btn btn-sm btn-warning me-1" title="Edit First Record"><i class="fas fa-edit"></i></a>
-                                                {{-- Note: Delete below is destructive and only deletes the first underlying record --}}
-                                                <form action="{{ route('budget.destroy', $firstId) }}" method="POST" class="d-inline delete-form">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="button" class="btn btn-sm btn-danger delete-btn"><i class="fas fa-trash"></i></button>
-                                                </form>
                                             @endif
                                         </td>
                                         <td class="text-nowrap">{{ $row['item_number'] }}</td>
@@ -239,19 +232,10 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// Placeholder for DELETE confirmation
-$(document).on('click', '.delete-btn', function(e) {
-    e.preventDefault();
-    if (confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) {
-        $(this).closest('form').submit();
-    }
-});
-</script>
-<script>
 $(function() {
     const selectedPivot = @json($pivot_months ?? []);
     const $filterForm = $('#filterForm');
-    const $exportForm = $('#exportForm');
+    const $bulkDeleteForm = $('#bulkDeleteForm');
     const $pivotHiddenInputsContainer = $('#pivotHiddenInputsContainer');
 
     function updateYearsLabel(selector, labelId) {
@@ -287,9 +271,6 @@ $(function() {
         monthly.forEach(function(ym) {
             $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo($pivotHiddenInputsContainer);
         });
-
-        $exportForm.find('input[name="pivot_months[]"]').remove();
-        $pivotHiddenInputsContainer.children().clone().appendTo($exportForm);
     }
 
     function syncMonthlyGroupsVisibility() {
@@ -381,14 +362,16 @@ $(function() {
     $('#select-all-resume').on('change', function() { 
         $('.select-resume').prop('checked', $(this).is(':checked')); 
     });
-
-    $('#exportBtn').on('click', function() {
+    
+    $('#bulkDeleteBtn').on('click', function() {
         const selected = $('.select-resume:checked').map(function(){ return $(this).val(); }).get();
         if (selected.length === 0) { 
-            console.error('Pilih setidaknya satu baris untuk diunduh.'); 
+            alert('Pilih setidaknya satu baris untuk dihapus secara massal.'); 
             return; 
         }
-        $('#exportForm')[0].submit();
+        if (confirm(`Anda yakin ingin menghapus ${selected.length} item budget (dan semua transaksi yang terkait)? Tindakan ini tidak dapat dibatalkan.`)) {
+             $('#bulkDeleteForm')[0].submit();
+        }
     });
 });
 </script>

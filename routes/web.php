@@ -22,12 +22,11 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 
 Route::middleware(['auth'])->group(function () {
     Route::resource('items', ItemController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
-    
     Route::get('/items/export-resume-detail', [ItemController::class, 'exportResumeDetail'])->name('items.exportResumeDetail');
-    Route::post('/items/export-selected', [ItemController::class, 'exportSelected'])->name('items.exportSelected');
-    
-    Route::resource('budget', BudgetController::class)->only(['index', 'store', 'edit', 'update', 'destroy']); 
-    Route::post('/budget/export-selected', [BudgetController::class, 'exportSelected'])->name('budget.exportSelected');
+    Route::post('/items/bulk-destroy', [ItemController::class, 'bulkDestroy'])->name('items.bulkDestroy');
+
+    Route::resource('budget', BudgetController::class)->only(['index', 'store', 'edit', 'update']); 
+    Route::post('/budget/bulk-destroy', [BudgetController::class, 'bulkDestroy'])->name('budget.bulkDestroy');
 });
 
 Route::middleware(['auth', 'role:AdminIT'])->group(function () {
