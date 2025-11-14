@@ -74,7 +74,6 @@
 <div class="container d-flex flex-column justify-content-center py-5">
     <h2 class="text-center mb-5">Welcome, {{ $user->name }}</h2>
     
-    {{-- Main Feature Cards --}}
     <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mt-3 mb-5">
         <div class="col-md-4">
             <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
@@ -88,6 +87,7 @@
             </a>
         </div>
         
+        @hasanyrole('AdminIT|Admin')
         <div class="col-md-4">
             <a href="{{ route('budget.index') }}" class="text-decoration-none card-link-hover">
                 <div class="card h-100 text-center shadow-sm p-3">
@@ -99,11 +99,11 @@
                 </div>
             </a>
         </div>
+        @endhasanyrole
     </div>
 
     <hr class="my-4">
 
-    {{-- Dashboard Section --}}
     <div class="row justify-content-center">
         <div class="col-12 text-center mb-4">
             <h3 class="text-primary-dark">Item Transaction & Budget Analysis Dashboard</h3>
@@ -124,7 +124,6 @@
                 <div class="card shadow p-4 h-100">
                     <h5 class="card-title text-center">Top Defisit/Fraud Items (Total < 0)</h5>
                     
-                    {{-- Prefix Filter Section --}}
                     @if(count($prefixes) > 0)
                     <div class="mb-3">
                         <label class="form-label small fw-bold mb-1">Filter Item Prefix (4 Huruf Awal)</label>
@@ -139,10 +138,8 @@
                     </div>
                     @endif
                     
-                    {{-- Deficit Items List --}}
                     <div style="max-height: 400px; overflow-y: auto;">
                         <ul class="list-group list-group-flush" id="fraudItemList">
-                            {{-- Items will be rendered by JavaScript --}}
                         </ul>
                         <p id="noFraudItemsMsg" class="text-center text-success mt-3" style="display: none;">Semua item yang cocok memiliki surplus! 🎉</p>
                     </div>
@@ -158,7 +155,6 @@
         
     </div>
 
-    {{-- Display logged-in status message below the cards --}}
     @if (session('status'))
         <div class="alert alert-success text-center mt-5" role="alert">
             {{ session('status') }}
@@ -166,12 +162,15 @@
     @endif
 </div>
 
-{{-- Bar Chart Modal --}}
 <div class="modal fade" id="barChartModal" tabindex="-1" aria-labelledby="barChartModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="barChartModalLabel">Monthly Detail: <span id="barChartItemNumber"></span></h5>
+                <h5 class="modal-title" id="barChartModalLabel">
+                    Monthly Detail: 
+                    <span id="barChartItemNumber"></span>
+                    <br><small id="barChartItemDetails" class="text-white-50"></small>
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -188,11 +187,16 @@
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-{{-- Chart.js CDN for powerful charting --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
     const DASHBOARD_DATA = @json($dashboardData);
     const MONTHLY_DATA = JSON.parse('{!! $monthlyDataJson !!}');
+    
+    const DASHBOARD_MAP = DASHBOARD_DATA.reduce((map, item) => {
+        map[item.item_number] = item;
+        return map;
+    }, {});
+    
     const FRAUD_ITEMS_RAW = DASHBOARD_DATA.filter(item => item.is_fraud_deficit);
     
     const pieData = {
@@ -218,7 +222,8 @@
 
     function createBarChart(itemNumber) {
         const itemMonthlyData = MONTHLY_DATA[itemNumber];
-        if (!itemMonthlyData) return;
+        const itemDetail = DASHBOARD_MAP[itemNumber];
+        if (!itemMonthlyData || !itemDetail) return;
         
         const allMonths = Object.keys(itemMonthlyData).sort();
         
@@ -227,7 +232,6 @@
         
         allMonths.forEach(month => {
             const data = itemMonthlyData[month] || {};
-            // Force Qty data to be positive (absolute value)
             qtyData.push(Math.abs(data.qty || 0)); 
             budgetData.push(data.budget || 0);
         });
@@ -247,16 +251,14 @@
                 }),
                 datasets: [
                     {
-                        label: 'Item Qty (Transaksi) [Absolut]',
+                        label: 'Pemakaian (Transaksi)',
                         data: qtyData,
-                        // CHANGED: Transaction (Qty) to Red
                         backgroundColor: '#dc3545', 
                         yAxisID: 'y',
                     },
                     {
                         label: 'Budget Allocated',
                         data: budgetData,
-                        // CHANGED: Budget to Green
                         backgroundColor: '#28a745', 
                         yAxisID: 'y',
                     }
@@ -288,6 +290,9 @@
                                     label += context.parsed.y.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
                                 }
                                 return label;
+                            },
+                            afterLabel: function(context) {
+                                return tooltipFraudItems[context.label] || '';
                             }
                         }
                     }
@@ -295,7 +300,8 @@
             }
         });
 
-        $('#barChartModalLabel span').text(itemNumber);
+        $('#barChartItemNumber').text(itemNumber);
+        $('#barChartItemDetails').text(`Desc: ${itemDetail.description} | UOM: ${itemDetail.uom}`); 
         $('#barChartModal').modal('show');
     }
     
@@ -342,11 +348,15 @@
         FRAUD_ITEMS_RAW.forEach(item => {
             const prefix = item.item_number.substring(0, 4).toUpperCase();
             
-            // If no prefixes are selected OR the item's prefix is in the selected list
             if (selectedPrefixes.length === 0 || selectedPrefixes.includes(prefix)) {
+                const shortDescription = item.description ? item.description.substring(0, 10) : '';
+                
                 listHtml += `
                     <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-danger py-2">
-                        <span class="me-auto">${item.item_number}</span>
+                        <span class="me-auto">
+                            ${item.item_number} 
+                            <small class="text-muted">(${shortDescription}${item.description.length > 10 ? '...' : ''})</small>
+                        </span>
                         <span class="fw-bold text-danger me-3">${formatNumber(item.combined_total)}</span>
                         <button class="btn btn-sm btn-danger view-item-detail" data-item-number="${item.item_number}" type="button">
                             <i class="fas fa-chart-bar"></i> Trend
@@ -368,13 +378,11 @@
 
     $(document).ready(function() {
         if (@json($canRenderChart)) {
-             initializeCharts();
+              initializeCharts();
         }
         
-        // Initial rendering of the list (without filters applied)
         renderFraudList([]);
 
-        // Filter Change Handler
         $(document).on('change', '.prefix-filter-checkbox', function() {
             const selected = $('.prefix-filter-checkbox:checked').map(function(){ 
                 return $(this).val(); 
@@ -382,7 +390,6 @@
             renderFraudList(selected);
         });
 
-        // Click handler for 'View Monthly Trend' buttons in the list
         $(document).on('click', '.view-item-detail', function() {
             const itemNumber = $(this).data('item-number');
             createBarChart(itemNumber);

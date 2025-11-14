@@ -93,14 +93,14 @@ function getDropdownBgColor($bgColor) {
 }
 
 
-$bgColor            = $settings['bg_color'] ?? '#f8f9fa';
-$navBgColor         = $settings['nav_bg_color'] ?? '#ffffff';
-$bgTextColor        = getTextColor($bgColor);
-$navTextColor       = getTextColor($navBgColor);
-$cardBgColor        = getCardBgColor($bgColor);
-$cardTextColor      = getTextColor($cardBgColor);
-$dropdownBgColor    = getDropdownBgColor($bgColor);
-$dropdownTextColor  = getTextColor($dropdownBgColor);
+$bgColor              = $settings['bg_color'] ?? '#f8f9fa';
+$navBgColor           = $settings['nav_bg_color'] ?? '#ffffff';
+$bgTextColor          = getTextColor($bgColor);
+$navTextColor         = getTextColor($navBgColor);
+$cardBgColor          = getCardBgColor($bgColor);
+$cardTextColor        = getTextColor($cardBgColor);
+$dropdownBgColor      = getDropdownBgColor($bgColor);
+$dropdownTextColor    = getTextColor($dropdownBgColor);
 @endphp
 
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -210,10 +210,6 @@ $dropdownTextColor  = getTextColor($dropdownBgColor);
             bottom: 7px;
         }
 
-        .navbar-nav .nav-link::after {
-            background-color: #3b82f6;
-        }
-
         .navbar-nav .nav-link:hover::before {
             width: 62.5%;
         }
@@ -301,9 +297,11 @@ $dropdownTextColor  = getTextColor($dropdownBgColor);
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('items.index') }}">Items</a>
                             </li>
+                            @hasanyrole('AdminIT|Admin')
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('budget.index') }}">Budget</a>
                             </li>
+                            @endhasanyrole
                             <li class="nav-item dropdown">
                                 <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button"
                                     data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
@@ -311,7 +309,9 @@ $dropdownTextColor  = getTextColor($dropdownBgColor);
                                 </a>
 
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    <a class="dropdown-item" href="{{ route('settings.index') }}">Settings</a>
+                                    @hasanyrole('AdminIT|Admin')
+                                        <a class="dropdown-item" href="{{ route('settings.index') }}">Settings</a>
+                                    @endhasanyrole
 
                                     <a class="dropdown-item" href="{{ route('logout') }}"
                                         onclick="event.preventDefault();document.getElementById('logout-form').submit();">

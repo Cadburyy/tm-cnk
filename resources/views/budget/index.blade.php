@@ -175,7 +175,7 @@
                                         <td class="select-cell"><input type="checkbox" class="select-resume" name="selected_ids[]" value="{{ $row['row_ids'] ?? '' }}"></td>
                                         {{-- ADDED: Action Buttons for Admin --}}
                                         <td class="text-nowrap">
-                                            @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin') : (auth()->user()->is_admin ?? false)) && $firstId)
+                                            @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)) && $firstId)
                                                 <a href="{{ route('budget.edit', $firstId) }}" class="btn btn-sm btn-warning me-1" title="Edit First Record"><i class="fas fa-edit"></i></a>
                                                 {{-- Note: Delete below is destructive and only deletes the first underlying record --}}
                                                 <form action="{{ route('budget.destroy', $firstId) }}" method="POST" class="d-inline delete-form">

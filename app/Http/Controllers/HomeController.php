@@ -33,6 +33,19 @@ class HomeController extends Controller
             ->pluck('total_budget', 'item_number')
             ->toArray();
             
+        $itemDetailsCollection = Item::select('item_number', 'item_description', 'unit_of_measure')
+            ->distinct()
+            ->get(); 
+            
+        $itemDetails = $itemDetailsCollection->mapWithKeys(function ($item) {
+            return [
+                $item->item_number => [
+                    'item_description' => $item->item_description,
+                    'unit_of_measure' => $item->unit_of_measure,
+                ]
+            ];
+        })->toArray();
+
         $monthlyData = [];
         $prefixes = [];
 
@@ -40,6 +53,12 @@ class HomeController extends Controller
             $qty = $itemAggregates[$itemNumber] ?? 0;
             $budget = $budgetAggregates[$itemNumber] ?? 0;
             $combined = $qty + $budget;
+            
+            $dbDetail = $itemDetails[$itemNumber] ?? [];
+            $detail = [
+                'description' => $dbDetail['item_description'] ?? '', 
+                'uom' => $dbDetail['unit_of_measure'] ?? '',
+            ];
 
             $dashboardData[$itemNumber] = [
                 'item_number' => $itemNumber,
@@ -47,6 +66,8 @@ class HomeController extends Controller
                 'total_budget' => (float)$budget,
                 'combined_total' => (float)$combined,
                 'is_fraud_deficit' => $combined < 0,
+                'description' => $detail['description'],
+                'uom' => $detail['uom'],
             ];
 
             $prefix = strtoupper(substr($itemNumber, 0, 4));
@@ -54,6 +75,10 @@ class HomeController extends Controller
                 $prefixes[$prefix] = true;
             }
         }
+        
+        usort($dashboardData, function($a, $b) {
+            return strcmp($a['item_number'], $b['item_number']);
+        });
         
         $monthlyItems = Item::whereIn('item_number', $itemNumbers)
             ->select('item_number', DB::raw('DATE_FORMAT(effective_date, "%Y-%m") as month'), DB::raw('SUM(loc_qty_change) as qty'))

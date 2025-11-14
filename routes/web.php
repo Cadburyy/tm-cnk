@@ -21,21 +21,22 @@ Auth::routes();
 Route::get('/home', [HomeController::class, 'index'])->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::resource('roles', RoleController::class);
-    Route::resource('users', UserController::class);
-
-    
     Route::resource('items', ItemController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
+    
     Route::get('/items/export-resume-detail', [ItemController::class, 'exportResumeDetail'])->name('items.exportResumeDetail');
     Route::post('/items/export-selected', [ItemController::class, 'exportSelected'])->name('items.exportSelected');
-
+    
     Route::resource('budget', BudgetController::class)->only(['index', 'store', 'edit', 'update', 'destroy']); 
     Route::post('/budget/export-selected', [BudgetController::class, 'exportSelected'])->name('budget.exportSelected');
 });
 
-Route::middleware(['auth', 'role:Admin'])->group(function () {
+Route::middleware(['auth', 'role:AdminIT'])->group(function () {
+    Route::resource('roles', RoleController::class);
+});
+
+Route::middleware(['auth', 'role:AdminIT|Admin'])->group(function () {
+    Route::resource('users', UserController::class);
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index'); 
-    
     Route::get('/settings/appearance', [SettingsController::class, 'editAppearance'])->name('settings.appearance');
     Route::put('/settings/appearance', [SettingsController::class, 'updateAppearance'])->name('settings.appearance.update');
 });

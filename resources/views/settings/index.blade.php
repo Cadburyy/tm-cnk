@@ -45,8 +45,7 @@
 <div class="container py-3">
     <h2 class="text-center mb-2"><strong>Settings Dashboard ⚙️</strong></h2>
     
-    @role('Admin')
-    {{-- CMS Settings --}}
+    @hasanyrole('AdminIT|Admin')
     <div class="text-center section-title">CMS Settings</div>
     <div class="row row-cols-1 row-cols-md-3 g-3 justify-content-center mt-1">
         <div class="col-md-4">
@@ -61,9 +60,7 @@
             </a>
         </div>
     </div>
-    @endrole
 
-    {{-- System Settings --}}
     <div class="text-center section-title">System Settings</div>
     <div class="row row-cols-1 row-cols-md-3 g-3 justify-content-center mt-1">
         <div class="col-md-4">
@@ -78,7 +75,7 @@
             </a>
         </div>
 
-        @role('Admin')
+        @role('AdminIT')
         <div class="col-md-4">
             <a href="{{ route('roles.index') }}" class="text-decoration-none card-link-hover">
                 <div class="card h-100 text-center shadow-sm p-3">
@@ -92,5 +89,6 @@
         </div>
         @endrole
     </div>
+    @endhasanyrole
 </div>
 @endsection
