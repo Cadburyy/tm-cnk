@@ -112,7 +112,7 @@
         @if($canRenderChart)
             <div class="col-md-6 mb-4">
                 <div class="card shadow p-4 h-100">
-                    <h5 class="card-title text-center">Combined Total Status (Qty + Budget)</h5>
+                    <h5 class="card-title text-center">Kombinasi Total Pemakaian & Budget</h5>
                     <p class="card-text text-center small text-muted">Klik bagian <span class="text-danger">Defisit/Fraud</span> untuk melihat detail bulanan.</p>
                     <div class="chart-container" style="height: 350px;">
                         <canvas id="pieChart"></canvas>
@@ -122,11 +122,11 @@
             
             <div class="col-md-6 mb-4">
                 <div class="card shadow p-4 h-100">
-                    <h5 class="card-title text-center">Top Defisit/Fraud Items (Total < 0)</h5>
+                    <h5 class="card-title text-center">Defisit/Fraud Items</h5>
                     
                     @if(count($prefixes) > 0)
                     <div class="mb-3">
-                        <label class="form-label small fw-bold mb-1">Filter Item Prefix (4 Huruf Awal)</label>
+                        <label class="form-label small fw-bold mb-1">Filter Item</label>
                         <div class="prefix-filter-container" id="prefixFilterContainer">
                             @foreach($prefixes as $prefix)
                                 <div class="form-check form-check-inline">
@@ -211,7 +211,7 @@
     
     const tooltipFraudItems = {
         'Surplus/Healthy': 'Total surplus items (Qty + Budget > 0)',
-        'Defisit/Fraud': 'Total deficit items (Qty + Budget < 0). Klik untuk melihat rincian item.',
+        'Defisit/Fraud': 'Total deficit items (Qty + Budget < 0)',
     };
 
     let currentBarChart = null;
