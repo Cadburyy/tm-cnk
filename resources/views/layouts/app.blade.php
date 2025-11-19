@@ -1,4 +1,5 @@
 <!doctype html>
+<<<<<<< HEAD
 @php
 use App\Models\Setting;
 use Illuminate\Support\Facades\Auth;
@@ -103,6 +104,7 @@ $dropdownBgColor      = getDropdownBgColor($bgColor);
 $dropdownTextColor    = getTextColor($dropdownBgColor);
 @endphp
 
+
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -168,16 +170,31 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
             background-color: var(--card-surface) !important;
             border-bottom: 1px solid var(--border) !important;
         }
+        </style>
 
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>{{ config('app.name', 'Laravel') }}</title>
+
+    <link rel="dns-prefetch" href="//fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=Nunito" rel="stylesheet">
+
+    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <style>
         .fixed-blur-navbar {
             position: fixed;
             top: 0;
             width: 100%;
             z-index: 1030;
             backdrop-filter: blur(5px);
+
             background-color: {{ hexToRgba($navBgColor, 0.8) }};
         }
-
+            background-color: rgba(255, 255, 255, 0.8);
+        }
         #loading-bar {
             position: absolute;
             bottom: 0;
@@ -188,6 +205,7 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
             transition: width 0.3s ease-in-out, opacity 0.5s ease-in-out;
             z-index: 1031;
         }
+
 
         .navbar-nav .nav-link {
             position: relative;
@@ -270,12 +288,19 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
     <div id="app">
         <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm fixed-blur-navbar">
             <div class="container">
+
                 <a class="navbar-brand d-flex align-items-center" href="{{ url('/') }}">
                     <img src="{{ $logoUrl }}" alt="Logo" style="height: 30px;">
                 </a>
                 <span class="ms-2 align-items-center">{{ $brand }}</span>
 
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+
+                <a class="navbar-brand" href="{{ url('/') }}">
+                    Citra Nugerah Karya
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" 
+
                     aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{{ __('Toggle navigation') }}">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -291,6 +316,7 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
                                 </li>
                             @endif
                         @else
+
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('home') }}">Home</a>
                             </li>
@@ -315,6 +341,32 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
 
                                     <a class="dropdown-item" href="{{ route('logout') }}"
                                         onclick="event.preventDefault();document.getElementById('logout-form').submit();">
+
+                            @php
+                                $user = Auth::user();
+                                $roleNames = $user ? $user->roles->pluck('name')->toArray() : [];
+                                $isAdmin = in_array('Admin', $roleNames);
+                                $isSupplierOnly = in_array('Supplier', $roleNames) && !$isAdmin;
+                            @endphp
+
+                            @if($isAdmin)
+                                <li><a class="nav-link" href="{{ route('users.index') }}">Manage Users</a></li>
+                                <li><a class="nav-link" href="{{ route('roles.index') }}">Manage Role</a></li>
+                                <li><a class="nav-link" href="{{ route('products.index') }}">Manage Product</a></li>
+                            @elseif($isSupplierOnly)
+                                <li><a class="nav-link" href="{{ route('products.index') }}">Manage Product</a></li>
+                            @endif
+
+                            <li class="nav-item dropdown">
+                                <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" 
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
+                                    {{ $user->name }}
+                                </a>
+
+                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="{{ route('logout') }}"
+                                       onclick="event.preventDefault();
+                                                     document.getElementById('logout-form').submit();">
                                         {{ __('Logout') }}
                                     </a>
 
@@ -332,6 +384,7 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
 
         <main class="py-4 mt-5">
             <div class="container-fluid">
+            <div class="container">
                 <div class="row justify-content-center">
                     <div class="col-md-12">
                         <div>
@@ -346,6 +399,7 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
     </div>
 
     <script>
+
         const loadingBar=document.getElementById('loading-bar');
         document.addEventListener('DOMContentLoaded',function(){
             loadingBar.style.width='90%';
@@ -353,6 +407,19 @@ $dropdownTextColor    = getTextColor($dropdownBgColor);
         window.addEventListener('load',function(){
             loadingBar.style.width='100%';
             loadingBar.style.opacity='0';
+        });
+    </script>
+</body>
+</html>
+        const loadingBar = document.getElementById('loading-bar');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadingBar.style.width = '90%';
+        });
+
+        window.addEventListener('load', function() {
+            loadingBar.style.width = '100%';
+            loadingBar.style.opacity = '0';
         });
     </script>
 </body>

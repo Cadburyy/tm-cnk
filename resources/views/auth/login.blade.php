@@ -11,17 +11,35 @@
                     </div>
 
                     <div class="col-12 p-4">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg">
+                <div class="row g-0">
+
+                    <div class="col-12 d-flex align-items-center justify-content-center bg-light p-4">
+                        <img src="{{ asset('images/cnk.png') }}" alt="CNK" class="img-fluid" style="max-height: 250px;">
+                    </div>
+
+                    <div class="col-12 p-4">
+
                         <h4 class="mb-4 text-center">{{ __('Login') }}</h4>
 
                         <form method="POST" action="{{ route('login') }}">
                             @csrf
 
                             <div class="mb-3">
+
                                 <label for="name" class="form-label">{{ __('Username') }}</label>
                                 <input id="name" type="text"
                                     class="form-control @error('name') is-invalid @enderror"
                                     name="name" value="{{ old('name') }}" required autocomplete="off" autofocus>
                                 @error('name')
+
+                                <label for="email" class="form-label">{{ __('Email Address') }}</label>
+                                <input id="email" type="email"
+                                    class="form-control @error('email') is-invalid @enderror"
+                                    name="email" value="{{ old('email') }}" required autocomplete="email" autofocus>
+                                @error('email')
+
                                     <span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>
                                 @enderror
                             </div>
@@ -30,7 +48,11 @@
                                 <label for="password" class="form-label">{{ __('Password') }}</label>
                                 <input id="password" type="password"
                                     class="form-control @error('password') is-invalid @enderror"
+
                                     name="password" required autocomplete="off">
+
+                                    name="password" required autocomplete="current-password">
+
                                 @error('password')
                                     <span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>
                                 @enderror
