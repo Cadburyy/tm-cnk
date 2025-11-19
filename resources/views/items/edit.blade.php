@@ -39,9 +39,6 @@
                             <label for="remarks" class="form-label fw-bold">Remarks</label>
                             <textarea name="remarks" id="remarks" rows="3" class="form-control">{{ old('remarks', $item->remarks) }}</textarea>
                         </div>
-                        
-                        {{-- Include other fields if necessary, like UOM, DEPT, Item Group --}}
-
                     </div>
                     <div class="card-footer d-flex justify-content-between">
                         <a href="{{ route('items.index') }}" class="btn btn-outline-secondary">

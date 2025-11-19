@@ -4,7 +4,7 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="text-dark">💰 Data Master Budget (Resume)</h1>
+        <h1 class="text-dark">💰 Data Budget Transaksi</h1>
         <div>
             <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
                 <i class="fas fa-file-upload me-1"></i> Upload Budget CSV
@@ -27,7 +27,7 @@
                     <div class="row g-3 mb-4">
 
                         <div class="col-lg-6 col-md-12">
-                            <label class="form-label fw-bold">Yearly (Totals / Averages)</label>
+                            <label class="form-label fw-bold">Yearly (Total / Rata-rata)</label>
                             <div class="card p-3 h-100">
                                 <div class="mb-2">
                                     <label class="form-label small mb-1">Pilih Tahun</label>
@@ -50,7 +50,7 @@
                                     <select id="yearlyMode" class="form-control form-control-sm" name="yearly_mode">
                                         <option value="">-- Pilih Mode --</option>
                                         <option value="total">Total</option>
-                                        <option value="avg">Average</option>
+                                        <option value="avg">Rata-rata</option>
                                     </select>
                                     <div class="small text-muted mt-1">Menampilkan Total atau Rata-rata budget tahunan.</div>
                                 </div>

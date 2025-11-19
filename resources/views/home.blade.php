@@ -153,7 +153,7 @@
                                             <strong>{{ $item[0] }}</strong>: <small>{{ $item[1] }}</small>
                                         </td>
                                     @else
-                                        <td class="{{ $colClass }}"></td> {{-- Empty cell for alignment --}}
+                                        <td class="{{ $colClass }}"></td>
                                     @endif
                                 @endfor
                             </tr>
@@ -232,7 +232,7 @@
                 <div class="chart-container" style="height: 400px;">
                     <canvas id="barChart"></canvas>
                 </div>
-                <p class="mt-3 small text-muted text-center">Kuantitas Item (Qty) [Absolut] vs. Budget (per bulan).</p>
+                <p class="mt-3 small text-muted text-center">Pemakaian Item vs Budget (per bulan).</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>

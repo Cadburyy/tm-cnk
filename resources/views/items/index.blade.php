@@ -69,7 +69,7 @@
                     @else
                         <div class="row g-3">
                             <div class="col-lg-6 col-md-12">
-                                <label class="form-label fw-bold">Yearly (Totals / Averages)</label>
+                                <label class="form-label fw-bold">Yearly (Total / Rata-rata)</label>
                                 <div class="card p-3 h-100">
                                     <div class="mb-2">
                                         <label class="form-label small mb-1">Pilih Tahun</label>
@@ -93,9 +93,9 @@
                                         <select id="yearlyMode" class="form-control form-control-sm" name="yearly_mode">
                                             <option value="">--Pilih Mode--</option>
                                             <option value="total" {{ (isset($yearly_mode) && $yearly_mode == 'total') ? 'selected' : '' }}>Total</option>
-                                            <option value="avg" {{ (isset($yearly_mode) && $yearly_mode == 'avg') ? 'selected' : '' }}>Average</option>
+                                            <option value="avg" {{ (isset($yearly_mode) && $yearly_mode == 'avg') ? 'selected' : '' }}>Rata-rata</option>
                                         </select>
-                                        <div class="small text-muted mt-1">Pilih apakah menampilkan Total atau Rata-rata untuk tahun yang dipilih.</div>
+                                        <div class="small text-muted mt-1">Pilih menampilkan Total atau Rata-rata untuk tahun yang dipilih.</div>
                                     </div>
                                 </div>
                             </div>

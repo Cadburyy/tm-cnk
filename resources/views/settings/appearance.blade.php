@@ -1,4 +1,3 @@
-C:\Project\bpb\resources\views\settings\appearance.blade.php
 @extends('layouts.app')
 
 @section('content')
