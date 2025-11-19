@@ -10,19 +10,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ItemController extends Controller
 {
+    /**
+     * Display a listing of the resource (Index or Pivot).
+     */
     public function index(Request $request)
     {
         if ($request->ajax() && $request->get('action') === 'pivot_row_details') {
             $id_list = $request->get('id_list');
             $item_key = $request->get('item_key');
+
             if (empty($id_list) || empty($item_key)) {
                 return response()->json(['details' => [], 'budget_data' => []]);
             }
+
             $ids = array_filter(array_map('trim', explode(',', $id_list)));
+            $item_number = explode('||', $item_key)[0] ?? null;
+
             if (empty($ids)) {
                 return response()->json(['details' => [], 'budget_data' => []]);
             }
-            $item_number = explode('||', $item_key)[0] ?? null;
 
             $details = Item::whereIn('id', $ids)
                 ->orderBy('effective_date', 'asc')
@@ -51,6 +57,7 @@ class ItemController extends Controller
 
             $first_item = $details->first();
             $total_qty = $details->sum('loc_qty_change');
+            
             return response()->json([
                 'item_key' => ($first_item) ? $first_item->item_number . '||' . $first_item->item_description . '||' . $first_item->unit_of_measure . '||' . $first_item->dept : 'N/A',
                 'total_qty' => $total_qty,
@@ -58,7 +65,7 @@ class ItemController extends Controller
                 'budget_data' => $budget_data,
             ]);
         }
-        
+
         $itemNumbers = DB::table('items')
             ->select('item_number')
             ->distinct()
@@ -87,9 +94,11 @@ class ItemController extends Controller
         $end_date = $request->input('end_date');
         $raw_selections = $request->input('pivot_months', []);
         $mode = $request->input('mode', 'resume');
+
         if ($mode === 'details' && (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)))) {
             $mode = 'resume';
         }
+        
         $item_number_term = $request->input('item_number_term');
         $item_description_term = $request->input('item_description_term');
         $item_group_term = $request->input('item_group_term');
@@ -130,7 +139,8 @@ class ItemController extends Controller
                     foreach ($selected_months as $ym) {
                         $q->orWhere('effective_date', 'LIKE', $ym . '-%');
                     }
-                    foreach ($selected_yearly as $year) {
+                    foreach ($selected_yearly as $yearEntry) {
+                        $year = explode('|', $yearEntry)[0];
                         $q->orWhereYear('effective_date', $year);
                     }
                 });
@@ -157,10 +167,12 @@ class ItemController extends Controller
 
         if ($mode == 'resume') {
             $final_months = [];
+            $yearly_mode = $request->input('yearly_mode', 'total'); 
+
             foreach ($selected_yearly as $yearEntry) {
                 $parts = explode('|', $yearEntry);
                 $year = $parts[0];
-                $type = $parts[1] ?? 'total';
+                $type = $parts[1] ?? $yearly_mode; 
                 if ($type === 'avg') {
                     $key = "YEARLY-{$year}|avg";
                     $final_months[$key] = ['key' => $key, 'label' => "Avg " . substr($year, 2, 2), 'type' => 'yearly_avg', 'year' => $year];
@@ -169,6 +181,7 @@ class ItemController extends Controller
                     $final_months[$key] = ['key' => $key, 'label' => "Total " . $year, 'type' => 'yearly_total', 'year' => $year];
                 }
             }
+
             $temp_months = [];
             foreach ($selected_months as $ym) {
                 try {
@@ -180,6 +193,7 @@ class ItemController extends Controller
             }
             ksort($temp_months);
             $months = array_merge($final_months, $temp_months);
+
             foreach ($items as $item) {
                 $year = Carbon::parse($item->effective_date)->format('Y');
                 $month_year = Carbon::parse($item->effective_date)->format('Y-m');
@@ -187,6 +201,7 @@ class ItemController extends Controller
                 $qty = $item->loc_qty_change;
                 $item_id = $item->id;
                 $remarks = trim((string)$item->remarks);
+
                 if (!isset($summary_rows[$key])) {
                     $summary_rows[$key] = [
                         'item_number' => $item->item_number,
@@ -201,6 +216,7 @@ class ItemController extends Controller
                         'remarks_set' => [],
                     ];
                 }
+
                 $summary_rows[$key]['months'][$month_year] = ($summary_rows[$key]['months'][$month_year] ?? 0) + $qty;
                 $summary_rows[$key]['total'] += $qty;
                 $summary_rows[$key]['annual_totals'][$year] = ($summary_rows[$key]['annual_totals'][$year] ?? 0) + $qty;
@@ -210,12 +226,14 @@ class ItemController extends Controller
                     $summary_rows[$key]['remarks_set'][$remarks] = true;
                 }
             }
+
             foreach ($summary_rows as $key => $row) {
                 foreach ($selected_yearly as $yearEntry) {
                     $parts = explode('|', $yearEntry);
                     $year = $parts[0];
-                    $type = $parts[1] ?? 'total';
+                    $type = $parts[1] ?? $yearly_mode;
                     $annual_total = $row['annual_totals'][$year] ?? 0;
+                    
                     if ($type === 'avg') {
                         $unique_months_in_data = count($row['annual_months_count'][$year] ?? []);
                         $yearly_key = "YEARLY-{$year}|avg";
@@ -227,6 +245,7 @@ class ItemController extends Controller
                 }
                 $summary_rows[$key]['row_ids'] = implode(',', array_unique($summary_rows[$key]['row_ids']));
                 $summary_rows[$key]['remarks'] = implode(' | ', array_keys($summary_rows[$key]['remarks_set'] ?? []));
+
                 unset($summary_rows[$key]['annual_totals']);
                 unset($summary_rows[$key]['annual_months_count']);
                 unset($summary_rows[$key]['remarks_set']);
@@ -252,7 +271,7 @@ class ItemController extends Controller
             'months' => array_values($months),
         ]);
     }
-    
+
     public function store(Request $request)
     {
         $request->validate([
@@ -276,11 +295,13 @@ class ItemController extends Controller
                 }
                 rewind($handle);
                 $header = fgetcsv($handle, 0, $delimiter);
+                
                 if (!$header || count($header) < 9) {
                     fclose($handle);
                     $errors[] = "File {$file->getClientOriginalName()}: Invalid format. Expected 9 columns, got " . (is_array($header) ? count($header) : 0);
                     continue;
                 }
+                
                 $batchData = [];
                 $rowNumber = 1;
                 while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
@@ -288,21 +309,25 @@ class ItemController extends Controller
                     if (!is_array($row) || count($row) < 9 || empty(trim($row[0] ?? ''))) {
                         continue;
                     }
+                    
                     $row = array_map(function($field) {
                         if ($field === null) return '';
                         $decoded = mb_convert_encoding($field, 'UTF-8', 'UTF-8, ISO-8859-1');
                         return trim($decoded);
                     }, $row);
+                    
                     $qty_field = $row[4] ?? '0';
-                    $qty_string = str_replace([' ',], ['',], $qty_field);
+                    $qty_string = str_replace([' '], [''], $qty_field);
                     $qty_string = str_replace(',', '.', $qty_string);
                     $qty_val = (float) $qty_string;
+                    
                     try {
                         $effective_date = Carbon::createFromFormat('d/m/Y', trim($row[2]));
                     } catch (\Exception $e) {
                         $errors[] = "File {$file->getClientOriginalName()}, Row {$rowNumber}: Invalid date format '{$row[2]}'. Use d/m/Y";
                         continue;
                     }
+                    
                     $batchData[] = [
                         'item_number' => $row[0] ?? null,
                         'item_description' => $row[1] ?? null,
@@ -327,6 +352,7 @@ class ItemController extends Controller
                 Item::insert($allData);
             }
             DB::commit();
+            
             $request->session()->forget('_old_input');
             $message = "{$uploadCount} records uploaded successfully!";
             if (!empty($errors)) {
@@ -339,62 +365,9 @@ class ItemController extends Controller
         }
     }
 
-    public function exportResumeDetail(Request $request)
-    {
-        $idLists = $request->input('id_lists');
-        $monthsParam = $request->input('months');
-
-        if (!$idLists) {
-            return back()->with('error', 'Invalid export request');
-        }
-
-        $allIdLists = explode('||', $idLists);
-        $allIds = [];
-        foreach ($allIdLists as $list) {
-            $ids = array_filter(array_map('trim', explode(',', $list)));
-            $allIds = array_merge($allIds, $ids);
-        }
-
-        $allIds = array_unique($allIds);
-        if (empty($allIds)) {
-            return back()->with('error', 'No items to export');
-        }
-
-        $items = Item::whereIn('id', $allIds)->orderBy('effective_date', 'asc')->get();
-        if ($items->isEmpty()) {
-            return back()->with('error', 'No data found');
-        }
-
-        $filename = 'bulk_detail_transaksi_' . now()->format('Ymd_His') . '.csv';
-        $response = new StreamedResponse(function() use ($items, $monthsParam) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['Item Number','Item Description','Effective Date','Bulan','Loc Qty Change','UOM','Remarks','Item Group','DEPT']);
-            foreach ($items as $it) {
-                try {
-                    $effective = Carbon::parse($it->effective_date)->format('d/m/Y');
-                } catch (\Exception $e) {
-                    $effective = $it->effective_date;
-                }
-                fputcsv($out, [
-                    $it->item_number,
-                    $it->item_description,
-                    $effective,
-                    $it->bulan,
-                    intval($it->loc_qty_change),
-                    $it->unit_of_measure,
-                    $it->remarks,
-                    $it->item_group,
-                    $it->dept,
-                ]);
-            }
-            fclose($out);
-        });
-
-        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
-        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
-        return $response;
-    }
-    
+    /**
+     * Delete a single resource.
+     */
     public function destroy($id)
     {
         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
@@ -407,6 +380,9 @@ class ItemController extends Controller
         return back()->with('error', 'Failed to delete record.');
     }
 
+    /**
+     * Bulk delete resources.
+     */
     public function bulkDestroy(Request $request)
     {
         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
@@ -432,7 +408,7 @@ class ItemController extends Controller
             DB::commit();
             
             if ($deletedCount > 0) {
-                return back()->with('success', "Successfully deleted {$deletedCount} records across " . count($all_ids_to_delete) . " items.");
+                return back()->with('success', "Successfully deleted {$deletedCount} records.");
             }
             return back()->with('error', 'Failed to delete any selected records.');
 
@@ -443,6 +419,9 @@ class ItemController extends Controller
         }
     }
     
+    /**
+     * Show the form for editing the specified resource.
+     */
     public function edit($id)
     {
         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {
@@ -452,6 +431,9 @@ class ItemController extends Controller
         return view('items.edit', compact('item'));
     }
     
+    /**
+     * Update the specified resource in storage.
+     */
     public function update(Request $request, $id)
     {
         if (!auth()->check() || !(method_exists(auth()->user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false))) {

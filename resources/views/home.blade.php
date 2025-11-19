@@ -25,6 +25,17 @@
     $chartColors = ['#28a745', '#dc3545']; 
     
     $canRenderChart = count($dashboardData) > 0 && $totalAll > 0;
+    
+    $itemPrefixKey = [
+        ['SCAK', 'AMPLAS, KIKIR'], ['SCAT', 'PYLOX'], ['SCBG', 'GERINDA, GERGAJI'], ['SCBT', 'BAUT'],
+        ['SCGS', 'GAS'], ['SCKL', 'KAWAT LAS'], ['SCMY', 'SOLAR, RUSH GUARD, PELUMAS, MINYAK SAYUR'], ['SCPC', 'PLASTIK, KARDUS, LEM, APD'],
+        ['SCSF', 'SERBUK PADI, ISOLASI'], ['STBO', 'MATA BOR, ENDMILL'], ['STCO', 'COLLET'], ['STHO', 'HOLDER'],
+        ['STIN', 'INSERT'], ['STMC', 'COMPONENT MESIN (PELATUK, CONTACT TIP, DLL)'], ['STPH', 'PAHAT'], ['STSC', 'SCREW'],
+        ['STSE', 'SEAT'], ['STTA', 'TAP'],
+    ];
+
+
+    $columns = 6;
 @endphp
 
 <style>
@@ -69,6 +80,18 @@
         border-radius: .25rem;
         margin-top: 10px;
     }
+
+    .prefix-key-table {
+        margin-bottom: 2rem;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    .prefix-key-table th, .prefix-key-table td {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        vertical-align: top;
+        line-height: 1.2;
+    }
 </style>
 
 <div class="container d-flex flex-column justify-content-center py-5">
@@ -109,6 +132,38 @@
             <h3 class="text-primary-dark">Item Transaction & Budget Analysis Dashboard</h3>
         </div>
         
+            <div class="card shadow-sm prefix-key-table mb-4">
+        <div class="card-header bg-primary text-black p-3">
+            <h5 class="mb-0">Kode & Item</h5>
+        </div>
+        <div class="card-body p-3">
+            <div class="table-responsive">
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        @for ($i = 0; $i < ceil(count($itemPrefixKey) / $columns); $i++)
+                            <tr>
+                                @for ($j = 0; $j < $columns; $j++)
+                                    @php
+                                        $index = $i * $columns + $j;
+                                        $item = $itemPrefixKey[$index] ?? null;
+                                        $colClass = 'col-1'; 
+                                    @endphp
+                                    @if ($item)
+                                        <td class="{{ $colClass }}">
+                                            <strong>{{ $item[0] }}</strong>: <small>{{ $item[1] }}</small>
+                                        </td>
+                                    @else
+                                        <td class="{{ $colClass }}"></td> {{-- Empty cell for alignment --}}
+                                    @endif
+                                @endfor
+                            </tr>
+                        @endfor
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
         @if($canRenderChart)
             <div class="col-md-6 mb-4">
                 <div class="card shadow p-4 h-100">
@@ -122,7 +177,7 @@
             
             <div class="col-md-6 mb-4">
                 <div class="card shadow p-4 h-100">
-                    <h5 class="card-title text-center">Defisit/Fraud Items</h5>
+                    <h5 class="card-title text-center">Pemakaian vs Budget</h5>
                     
                     @if(count($prefixes) > 0)
                     <div class="mb-3">

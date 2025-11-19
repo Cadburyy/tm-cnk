@@ -77,7 +77,7 @@ class HomeController extends Controller
         }
         
         usort($dashboardData, function($a, $b) {
-            return strcmp($a['item_number'], $b['item_number']);
+            return $a['combined_total'] <=> $b['combined_total'];
         });
         
         $monthlyItems = Item::whereIn('item_number', $itemNumbers)

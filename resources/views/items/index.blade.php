@@ -174,7 +174,6 @@
                 </div>
  
                 <div class="card-footer d-flex justify-content-end gap-2">
-                    {{-- Bulk Delete Button (Only visible in Details mode) --}}
                     @if ($mode == 'details')
                         @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? Auth::user()->hasRole('Admin|AdminIT') : (Auth::user()->is_admin ?? false)))
                             <button type="button" id="bulkDeleteBtn" class="btn btn-danger shadow-sm">
@@ -182,8 +181,6 @@
                             </button>
                         @endif
                     @endif
-                    
-                    {{-- Download Selected CSV Button REMOVED --}}
                     
                     <input type="hidden" name="mode" value="{{ $mode }}">
                     @foreach($pivot_months as $p)
@@ -201,7 +198,6 @@
         </div>
     </form>
 
-    {{-- Bulk Delete Form (Visible=none, used by JS) --}}
     <form id="bulkDeleteForm" method="POST" action="{{ route('items.bulkDestroy') }}" style="display:none;">
         @csrf
         <div id="bulkDeleteIdsContainer"></div>
@@ -223,7 +219,7 @@
             @if ($mode == 'details')
                 Hasil Data Transaksi - Details (Total {{ $items->count() }} Records)
             @else
-                Hasil Data Transaksi - Resume (Total {{ count($summary_rows) }} Items)
+                Hasil Data Transaksi - Resume (Total {{ count(collect($summary_rows)->groupBy('item_number')) }} Item Groups)
             @endif
         </div>
         <div class="card-body p-0">
@@ -236,7 +232,7 @@
                             <thead class="bg-light sticky-top">
                                 <tr>
                                     <th style="width:36px"><input type="checkbox" id="select-all-details"></th>
-                                    <th class="text-nowrap text-center">Aksi</th> {{-- Centered --}}
+                                    <th class="text-nowrap text-center">Aksi</th>
                                     <th class="text-nowrap">Item Number</th>
                                     <th class="text-nowrap bg-primary text-white">Item Description</th>
                                     <th class="text-nowrap">Effective Date</th>
@@ -252,10 +248,9 @@
                                 @foreach($items as $item)
                                     <tr>
                                         <td><input type="checkbox" class="select-detail" name="selected_ids[]" value="{{ $item->id }}"></td>
-                                        <td class="text-nowrap text-center"> {{-- Centered --}}
+                                        <td class="text-nowrap text-center">
                                             @if(Auth::check() && (method_exists(Auth::user(), 'hasRole') ? auth()->user()->hasRole('Admin|AdminIT') : (auth()->user()->is_admin ?? false)))
                                                 <a href="{{ route('items.edit', $item->id) }}" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></a>
-                                                {{-- DELETE BUTTON REMOVED as requested --}}
                                             @endif
                                         </td>
                                         <td class="text-nowrap">{{ $item->item_number }}</td>
@@ -283,6 +278,7 @@
                         <table class="table table-bordered table-striped table-hover table-sm mb-0">
                             <thead class="bg-light sticky-top">
                                 <tr>
+                                    <th style="width:30px;" class="text-center">+/-</th>
                                     <th class="text-nowrap">Item Number</th>
                                     <th class="text-nowrap bg-primary text-white">Item Description</th>
                                     <th class="text-nowrap">UOM</th>
@@ -292,25 +288,106 @@
                                         @endforeach
                                     @endif
                                     <th class="text-nowrap text-center" style="min-width:90px;">Total Qty</th>
-                                    <th class="text-nowrap">Departemen</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($summary_rows as $row)
-                                    <tr class="resume-row-clickable" data-item-key="{{ $row['item_number'] }}||{{ $row['item_description'] }}||{{ $row['unit_of_measure'] }}||{{ $row['dept'] }}" data-id-list="{{ $row['row_ids'] ?? '' }}" style="cursor: pointer;" title="Klik untuk melihat detail">
-                                        <td class="text-nowrap">{{ $row['item_number'] }}</td>
-                                        <td style="max-width:300px; background-color: #e7f1ff;">{{ $row['item_description'] }}</td>
-                                        <td>{{ $row['unit_of_measure'] }}</td>
+                                @php
+                                    $groupedRows = collect($summary_rows)->groupBy('item_number');
+                                @endphp
+
+                                @foreach($groupedRows as $itemNumber => $rows)
+                                    @php
+                                        $itemTotalRaw = $rows->sum('total');
+                                        $itemUOM = $rows->first()['unit_of_measure'] ?? '';
+                                        $itemDesc = $rows->first()['item_description'] ?? '';
+                                        $allDepts = $rows->pluck('dept')->unique()->implode('|');
+                                        $itemKey = $itemNumber . '||' . $itemDesc . '||' . $itemUOM . '||' . $allDepts;
+                                        $allRowIds = $rows->pluck('row_ids')->map(fn($ids) => explode(',', $ids))->flatten()->unique()->implode(',');
+
+                                        $pivotTotals = [];
+                                        $pivotTotalsRaw = [];
+                                        foreach ($months as $m) {
+                                            $key = $m['key'];
+                                            $raw = $rows->sum(function ($row) use ($key) {
+                                                return $row['months'][$key] ?? 0;
+                                            });
+                                            $pivotTotalsRaw[$key] = (int)$raw;
+                                            $pivotTotals[$key] = number_format($raw, 0, ',', '.');
+                                        }
+
+                                        $itemTotalFormatted = number_format($itemTotalRaw, 0, ',', '.');
+                                    @endphp
+
+                                    <tr class="item-master-row resume-row-clickable"
+                                        data-item-key="{{ $itemKey }}"
+                                        data-id-list="{{ $allRowIds }}"
+                                        data-item-number="{{ $itemNumber }}"
+                                        style="cursor: pointer; background-color: #f8f9fa;" title="Klik untuk melihat detail item">
+                                        <td class="text-center" style="width:30px;">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary toggle-dept-btn" data-item-number="{{ $itemNumber }}">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </td>
+
+                                        <td class="text-nowrap fw-bold">{{ $itemNumber }}</td>
+                                        <td style="max-width:300px; background-color: #e7f1ff;">{{ $itemDesc }}</td>
+                                        <td>{{ $itemUOM }}</td>
+
                                         @if (count($months) > 0)
                                             @foreach($months as $m)
-                                                @php $val = intval($row['months'][$m['key']] ?? 0); @endphp
-                                                <td class="text-end font-monospace {{ $val < 0 ? 'text-danger fw-bold' : 'text-success' }}" style="min-width:80px;">{{ $val }}</td>
+                                                @php
+                                                    $rawVal = $pivotTotalsRaw[$m['key']] ?? 0;
+                                                    $formattedVal = $pivotTotals[$m['key']] ?? number_format(0,0,',','.');
+                                                @endphp
+                                                <td class="text-end font-monospace {{ $rawVal < 0 ? 'text-danger fw-bold' : 'text-success' }}" style="min-width:80px;">
+                                                    {{ $formattedVal }}
+                                                </td>
                                             @endforeach
                                         @endif
-                                        @php $totalVal = intval($row['total']); @endphp
-                                        <td class="text-end fw-bold font-monospace bg-light {{ $totalVal < 0 ? 'text-danger' : 'text-success' }}" style="min-width:90px;">{{ $totalVal }}</td>
-                                        <td class="text-nowrap">{{ $row['dept'] }}</td>
+
+                                        <td class="text-end fw-bold font-monospace bg-light {{ $itemTotalRaw < 0 ? 'text-danger' : 'text-success' }}" style="min-width:90px;">
+                                            {{ $itemTotalFormatted }}
+                                        </td>
                                     </tr>
+
+                                    @foreach($rows as $row)
+                                        @php
+                                            $deptTotalRaw = (int) ($row['total'] ?? 0);
+                                        @endphp
+                                        <tr class="item-dept-detail-row item-number-{{ $itemNumber }}" style="display:none; background-color: #ffffff;">
+                                            <td class="text-center" style="width:30px;">
+                                                <button type="button" class="btn btn-sm btn-outline-primary show-dept-detail-btn"
+                                                    data-dept-row-id="{{ $row['row_ids'] }}"
+                                                    data-dept-item-key="{{ $row['item_number'] }}||{{ $row['item_description'] }}||{{ $row['unit_of_measure'] }}||{{ $row['dept'] }}"
+                                                    title="Klik untuk lihat detail department">
+                                                    <i class="fas fa-search-plus"></i>
+                                                </button>
+                                            </td>
+
+                                            <td colspan="2" class="ps-5 text-nowrap small text-muted">
+                                                DEPT: <span class="fw-bold text-dark">{{ $row['dept'] }}</span>
+                                                <span class="badge bg-secondary ms-2">{{ count(explode(',', $row['row_ids'])) }} records</span>
+                                            </td>
+
+                                            <td>{{ $row['unit_of_measure'] }}</td>
+
+                                            @if (count($months) > 0)
+                                                @foreach($months as $m)
+                                                    @php
+                                                        $rawDeptVal = (int) ($row['months'][$m['key']] ?? 0);
+                                                        $formattedDeptVal = number_format($rawDeptVal, 0, ',', '.');
+                                                    @endphp
+                                                    <td class="text-end font-monospace small {{ $rawDeptVal < 0 ? 'text-danger' : 'text-success' }}" style="min-width:80px;">
+                                                        {{ $formattedDeptVal }}
+                                                    </td>
+                                                @endforeach
+                                            @endif
+
+                                            <td class="text-end fw-bold font-monospace small bg-light {{ $deptTotalRaw < 0 ? 'text-danger' : 'text-success' }}" style="min-width:90px;">
+                                                {{ number_format($deptTotalRaw, 0, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
                                 @endforeach
                             </tbody>
                         </table>
@@ -366,11 +443,10 @@
                             <div>
                                 <p class="fw-bold mb-1">Item:</p>
                                 <p class="mb-2 ps-2" id="detail-item-info"></p>
-                                <p class="fw-bold mb-1">Combined Total (Qty + Budget):</p>
+                                <p class="fw-bold mb-1">Total Pemakaian + Budget:</p>
                                 <p class="mb-0 ps-2 fw-bold" id="detail-total-info"></p>
                             </div>
                             <div>
-                                {{-- Download Detail CSV button now uses client-side JS to capture visible table --}}
                                 <button id="downloadModalDataBtn" class="btn btn-sm btn-outline-success" data-id-list="" data-item-key="">
                                     <i class="fas fa-download me-1"></i> Download Detail CSV
                                 </button>
@@ -414,35 +490,25 @@
 let deleteFormToSubmit = null;
 let isBulkDelete = false;
 
-$('#bulkDeleteBtn').on('click', function(e) {
-    e.preventDefault();
-    const selected = $('.select-detail:checked').map(function(){ return $(this).val(); }).get();
-    
-    if (selected.length === 0) {
-        alert('Pilih setidaknya satu baris untuk dihapus.');
-        return;
-    }
+function formatQty(value) {
+    if (value === null || value === undefined || value === '') return '0';
+    value = value.toString().replace(/[^0-9\-]/g, '');
+    return value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
 
-    $('#bulkDeleteIdsContainer').empty();
 
-    selected.forEach(function(val) {
-        $('<input>').attr({ type: 'hidden', name: 'selected_ids[]', value: val }).appendTo('#bulkDeleteIdsContainer');
-    });
+function getColorClass(qty) {
+    return qty < 0 ? 'text-danger fw-bold' : (qty > 0 ? 'text-success' : '');
+}
 
-    deleteFormToSubmit = $('#bulkDeleteForm');
-    isBulkDelete = true;
-    
-    $('#deleteActionType').text(`Anda akan menghapus ${selected.length} transaksi. Aksi ini tidak dapat dibatalkan.`);
-    $('#deleteRecordDesc').text(`Total ${selected.length} records.`);
-    $('#deleteConfirmModal').modal('show');
-});
-
-$('#confirmDeleteBtn').on('click', function() {
-    if (deleteFormToSubmit) {
-        $('#deleteConfirmModal').modal('hide');
-        deleteFormToSubmit.submit();
-    }
-});
+function escapeHtml(unsafe) { 
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;"); 
+}
 
 function exportTableToCSV(tableId, itemKey, delimiter = ';') {
     const $table = $('#' + tableId);
@@ -469,7 +535,7 @@ function exportTableToCSV(tableId, itemKey, delimiter = ';') {
     });
     csv = csv.slice(0, -1) + '\n';
 
-    $table.find('tbody tr, tfoot tr').each(function() {
+    $table.find('tbody tr:visible, tfoot tr').each(function() {
         $(this).find('td').each(function() {
             csv += sanitize($(this).text()) + delimiter;
         });
@@ -495,68 +561,54 @@ function exportTableToCSV(tableId, itemKey, delimiter = ';') {
     }
 }
 
-$('#downloadModalDataBtn').on('click', function() {
-    const itemKey = $(this).data('item-key');
-    
-    if (!$('#detailTable').length) {
-        alert('Tidak ada data tabel yang tersedia untuk diunduh.');
-        return;
+function updateYearsLabel(selector, labelId) {
+    const checked = $(selector + ':checked');
+    let label = 'Pilih Tahun';
+    if (checked.length === 1) {
+        label = checked.val();
+    } else if (checked.length > 1) {
+        label = checked.length + ' Tahun terpilih';
     }
+    $(labelId).text(label);
+}
 
-    exportTableToCSV('detailTable', itemKey, ';'); 
-});
+function updateMonthsCount() {
+    const count = ($('.monthly-month-checkbox:checked').length) || 0;
+    $('#months-selected-count').text(count + ' Bulan terpilih');
+}
+
+function rebuildPivotHiddenInputs() {
+    $('input[name="pivot_months[]"]', '#filterForm').remove();
+
+    const yearlyYears = $('.yearly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
+    const yearlyMode = $('#yearlyMode').val() || 'total';
+    yearlyYears.forEach(function(y) {
+        const val = 'YEARLY-' + y + '|' + yearlyMode;
+        $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: val}).appendTo('#filterForm');
+    });
+
+    const monthly = $('.monthly-month-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
+    monthly.forEach(function(ym) {
+        $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo('#filterForm');
+    });
+}
+
+function syncMonthlyGroupsVisibility() {
+    const selYears = $('.monthly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
+    $('.monthly-year-group').each(function(){
+        const y = $(this).data('year') + '';
+        if (selYears.indexOf(y) !== -1) $(this).show();
+        else $(this).hide().find('.monthly-month-checkbox').prop('checked', false);
+    });
+}
 
 $(function() {
     const selectedPivot = @json($pivot_months ?? []);
     const mode = '{{ $mode }}';
     const pivotMonths = @json($months ?? []);
     const currentUrl = '{{ route('items.index') }}';
-    
-    function updateYearsLabel(selector, labelId) {
-        const checked = $(selector + ':checked');
-        let label = 'Pilih Tahun';
-        if (checked.length === 1) {
-            label = checked.val();
-        } else if (checked.length > 1) {
-            label = checked.length + ' Tahun terpilih';
-        }
-        $(labelId).text(label);
-    }
-
-    function updateMonthsCount() {
-        const count = ($('.monthly-month-checkbox:checked').length) || 0;
-        $('#months-selected-count').text(count + ' Bulan terpilih');
-    }
-
-    function rebuildPivotHiddenInputs() {
-        $('input[name="pivot_months[]"]', '#filterForm').remove();
-
-        const yearlyYears = $('.yearly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
-        const yearlyMode = $('#yearlyMode').val() || 'total';
-        yearlyYears.forEach(function(y) {
-            const val = 'YEARLY-' + y + '|' + yearlyMode;
-            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: val}).appendTo('#filterForm');
-        });
-
-        const monthly = $('.monthly-month-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
-        monthly.forEach(function(ym) {
-            $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: ym}).appendTo('#filterForm');
-        });
-    }
-
-    function syncMonthlyGroupsVisibility() {
-        const selYears = $('.monthly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
-        $('.monthly-year-group').each(function(){
-            const y = $(this).data('year') + '';
-            if (selYears.indexOf(y) !== -1) $(this).show();
-            else $(this).hide().find('.monthly-month-checkbox').prop('checked', false);
-        });
-    }
 
     if (mode === 'resume') {
-        $('input[name="item_number_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
-        $('input[name="item_description_term"]').on('input', function() { $(this).val($(this).val().toUpperCase()); });
-
         $('.yearly-year-checkbox').on('change', function() {
             updateYearsLabel('.yearly-year-checkbox', '#yearlyYearsLabel');
             rebuildPivotHiddenInputs();
@@ -624,32 +676,81 @@ $(function() {
     }
 
     $('#select-all-details').on('change', function() { $('.select-detail').prop('checked', $(this).is(':checked')); });
-    
-    function formatQty(qty) { 
-        const n = parseFloat(qty) || 0; 
-        return n.toLocaleString('id-ID', { minimumFractionDigits: (n % 1 === 0 ? 0 : 2), maximumFractionDigits: 2 }); 
-    }
 
-    function getColorClass(qty) {
-        return qty < 0 ? 'text-danger fw-bold' : 'text-success';
-    }
+    $('#bulkDeleteBtn').on('click', function(e) {
+        e.preventDefault();
+        const selected = $('.select-detail:checked').map(function(){ return $(this).val(); }).get();
+        
+        if (selected.length === 0) {
+            alert('Pilih setidaknya satu baris untuk dihapus.');
+            return;
+        }
 
-    function escapeHtml(unsafe) { 
-        return String(unsafe)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;"); 
-    }
-    
-    $(document).on('click', '.resume-row-clickable td', function(event) {
-        const $row = $(this).closest('.resume-row-clickable');
-        const itemKey = $row.data('item-key') || '';
-        const idList = $row.data('id-list') || '';
+        $('#bulkDeleteIdsContainer').empty();
+
+        selected.forEach(function(val) {
+            $('<input>').attr({ type: 'hidden', name: 'selected_ids[]', value: val }).appendTo('#bulkDeleteIdsContainer');
+        });
+
+        deleteFormToSubmit = $('#bulkDeleteForm');
+        isBulkDelete = true;
+        
+        $('#deleteActionType').text(`Anda akan menghapus ${selected.length} transaksi. Aksi ini tidak dapat dibatalkan.`);
+        $('#deleteRecordDesc').text(`Total ${selected.length} records.`);
+        $('#deleteConfirmModal').modal('show');
+    });
+
+    $('#confirmDeleteBtn').on('click', function() {
+        if (deleteFormToSubmit) {
+            $('#deleteConfirmModal').modal('hide');
+            deleteFormToSubmit.submit();
+        }
+    });
+
+    $(document).on('click', '.toggle-dept-btn', function() {
+        const $btn = $(this);
+        const itemNumber = $btn.data('item-number');
+        const $detailRows = $('.item-number-' + itemNumber);
+        const isExpanded = $btn.find('i').hasClass('fa-minus');
+
+        if (isExpanded) {
+            $detailRows.hide();
+            $btn.find('i').removeClass('fa-minus').addClass('fa-plus');
+        } else {
+            $detailRows.show();
+            $btn.find('i').removeClass('fa-plus').addClass('fa-minus');
+        }
+    });
+
+    $('#downloadModalDataBtn').on('click', function() {
+        const itemKey = $(this).data('item-key');
+        
+        if (!$('#detailTable').length) {
+            alert('Tidak ada data tabel yang tersedia untuk diunduh.');
+            return;
+        }
+
+        exportTableToCSV('detailTable', itemKey, ';'); 
+    });
+
+    $(document).on('click', '.item-master-row, .show-dept-detail-btn', function(event) {
+        if ($(event.target).closest('.toggle-dept-btn').length) {
+            return;
+        }
+        
+        const $el = $(this);
+        let itemKey, idList;
+        
+        if ($el.hasClass('item-master-row')) {
+            itemKey = $el.data('item-key') || '';
+            idList = $el.data('id-list') || '';
+        } else {
+            itemKey = $el.data('dept-item-key') || '';
+            idList = $el.data('dept-row-id') || '';
+        }
         
         if (!idList) return;
-        
+
         $('#detail-content').hide();
         $('#detail-loading').show();
         $('#pivotDetailModal').modal('show');
@@ -659,12 +760,15 @@ $(function() {
         const itemDesc = parts[1] || '';
         const uom = parts[2] || '';
         const dept = parts[3] || '';
-        
-        $('#detail-item-info').text(itemNumber + ' - ' + itemDesc + ' (' + uom + ') - DEPT: ' + dept);
+
+        $('#detail-item-info').html(
+            '<strong>Item:</strong> ' + escapeHtml(itemNumber) + ' - ' + escapeHtml(itemDesc) + 
+            ' (' + escapeHtml(uom) + ')<br><strong>Department(s):</strong> ' + escapeHtml(dept)
+        );
         $('#detail-total-info').text('');
         $('#downloadModalDataBtn').data('id-list', idList).data('item-key', itemKey); 
 
-        $('#detail-table-container').html('<table class="table table-striped table-bordered table-sm"><thead class="sticky-top bg-light"><tr><th>Remark</th></tr></thead><tbody id="detail-table-body"></tbody></table>');
+        $('#detail-table-container').html('<table class="table table-striped table-bordered table-sm"><thead class="sticky-top bg-light"><tr><th>Loading...</th></tr></thead></table>');
 
         $.ajax({
             url: currentUrl,
@@ -674,34 +778,31 @@ $(function() {
             success: function(response) {
                 const displayKeys = pivotMonths.map(function(m){ return String(m.key); });
                 const displayLabels = pivotMonths.map(function(m){ return String(m.label); });
-                const monthKeys = displayKeys.filter(function(k){ return !k.startsWith('YEARLY-'); });
-                const monthLabels = displayLabels.filter(function(_, i){ return !displayKeys[i].startsWith('YEARLY-'); });
-                const yearlyKeys = displayKeys.filter(function(k){ return k.startsWith('YEARLY-'); });
-                const yearlyLabels = displayLabels.filter(function(_, i){ return displayKeys[i].startsWith('YEARLY-'); });
-                
-                const isAnyFilterActive = monthKeys.length > 0 || yearlyKeys.length > 0;
-                
-                const groups = {}; 
+                const isAnyFilterActive = displayKeys.length > 0;
+
+                const itemGroupsByDeptRemark = {}; 
                 let grandItemQtyTotal = 0;
-                let itemQtyDataCache = {}; 
                 
                 if (Array.isArray(response.details) && response.details.length > 0) {
                     response.details.forEach(function(detail) {
-                        const remark = (detail.remarks || '').trim() || '(No Remark)';
+                        const deptRemarkKey = (detail.dept || '(No Dept)') + '||' + ((detail.remarks || '').trim() || '(No Remark)');
                         const mkey = detail.effective_date ? detail.effective_date.slice(0,7) : '';
                         const qty = parseFloat(detail.loc_qty_change) || 0;
-                        
-                        if (!itemQtyDataCache[mkey]) itemQtyDataCache[mkey] = { qty: 0, annual_months_set: {} };
-                        itemQtyDataCache[mkey].qty += qty;
-                        itemQtyDataCache[mkey].annual_months_set[mkey] = true;
 
-                        if (!groups[remark]) groups[remark] = { months: {}, total: 0, annual_totals: {}, annual_months_set: {} };
-                        groups[remark].months[mkey] = (groups[remark].months[mkey] || 0) + qty;
+                        if (!itemGroupsByDeptRemark[deptRemarkKey]) {
+                            itemGroupsByDeptRemark[deptRemarkKey] = { 
+                                dept: detail.dept || '(No Dept)', 
+                                remark: (detail.remarks || '').trim() || '(No Remark)',
+                                months: {}, total: 0, annual_totals: {}, annual_months_set: {} 
+                            };
+                        }
+                        
+                        itemGroupsByDeptRemark[deptRemarkKey].months[mkey] = (itemGroupsByDeptRemark[deptRemarkKey].months[mkey] || 0) + qty;
                         const year = String(mkey).slice(0,4);
-                        groups[remark].annual_totals[year] = (groups[remark].annual_totals[year] || 0) + qty;
-                        groups[remark].annual_months_set[year] = groups[remark].annual_months_set[year] || {};
-                        if (mkey) groups[remark].annual_months_set[year][mkey] = true;
-                        groups[remark].total += qty;
+                        itemGroupsByDeptRemark[deptRemarkKey].annual_totals[year] = (itemGroupsByDeptRemark[deptRemarkKey].annual_totals[year] || 0) + qty;
+                        itemGroupsByDeptRemark[deptRemarkKey].annual_months_set[year] = itemGroupsByDeptRemark[deptRemarkKey].annual_months_set[year] || {};
+                        if (mkey) itemGroupsByDeptRemark[deptRemarkKey].annual_months_set[year][mkey] = true;
+                        itemGroupsByDeptRemark[deptRemarkKey].total += qty;
                         grandItemQtyTotal += qty;
                     });
                 }
@@ -723,206 +824,175 @@ $(function() {
                 });
                 
                 const grandCombinedTotal = grandItemQtyTotal + grandBudgetTotal;
-                let totalColorClass;
+                const totalColorClass = getColorClass(grandCombinedTotal);
 
-                if (grandCombinedTotal < 0) {
-                    totalColorClass = 'text-danger fw-bold'; 
-                } else if (grandCombinedTotal > 0) {
-                    totalColorClass = (grandBudgetTotal >= grandItemQtyTotal) ? 'text-success' : 'text-danger fw-bold';
-                } else {
-                    totalColorClass = ''; 
-                }
-                
+                const getGrandPivotTotal = (key, type, isBudget) => {
+                    const itemGroups = Object.values(itemGroupsByDeptRemark);
+                    
+                    if (key.startsWith('YEARLY-')) {
+                        const year = key.replace('YEARLY-', '').split('|')[0];
+                        const annualTotal = isBudget ? (annualBudgetTotals[year] || 0) : itemGroups.reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
+                        
+                        if (type === 'avg') {
+                            let distinctMonthsSet = {};
+                            itemGroups.forEach(g => {
+                                Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                            });
+                            Object.keys(budgetDataCache).forEach(mkey => {
+                                if (mkey.startsWith(year)) distinctMonthsSet[mkey] = true;
+                            });
+                            const count = Object.keys(distinctMonthsSet).length;
+                            return count ? (annualTotal / count) : 0;
+                        }
+                        return annualTotal;
+                    } else {
+                        const itemVal = itemGroups.reduce((acc, g) => acc + (g.months[key] || 0), 0);
+                        const budgetVal = budgetDataCache[key] ? budgetDataCache[key].budget : 0;
+                        return isBudget ? budgetVal : itemVal;
+                    }
+                };
+
+                const getDeptPivotTotal = (deptRows, key, type) => {
+                    if (key.startsWith('YEARLY-')) {
+                        const year = key.replace('YEARLY-', '').split('|')[0];
+                        const annualTotal = deptRows.reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
+
+                        if (type === 'avg') {
+                            let distinctMonthsSet = {};
+                            deptRows.forEach(g => {
+                                Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
+                            });
+                            const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
+                            return distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
+                        }
+                        return annualTotal;
+                    } else {
+                        return deptRows.reduce((acc, g) => acc + (g.months[key] || 0), 0);
+                    }
+                };
+
                 if (grandItemQtyTotal !== 0 || grandBudgetTotal !== 0) {
 
-                    if (isAnyFilterActive) {
-                        let thead = '<tr><th>Remark / Source</th>';
-                        monthLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + escapeHtml(label) + '</th>'; });
-                        yearlyLabels.forEach(function(label) { thead += '<th class="text-center text-nowrap">' + escapeHtml(label) + '</th>'; });
-                        thead += '<th class="text-end">Total</th></tr>';
-                        let tbodyHtml = '';
+                    const thead = '<tr><th>Remark / Source</th>' + 
+                                  (isAnyFilterActive 
+                                    ? displayLabels.map(label => `<th class="text-center text-nowrap">${escapeHtml(label)}</th>`).join('') 
+                                    : '') + 
+                                  '<th class="text-end">Total</th></tr>';
+                    
+                    let tbodyHtml = '';
+                    const deptGroups = {};
+                    Object.values(itemGroupsByDeptRemark).forEach(g => {
+                        const d = g.dept;
+                        if (!deptGroups[d]) deptGroups[d] = [];
+                        deptGroups[d].push(g);
+                    });
+                    const sortedDeptKeys = Object.keys(deptGroups).sort();
+
+                    sortedDeptKeys.forEach(function(deptName) {
+                        const $deptRows = deptGroups[deptName];
+                        const deptKeyClean = deptName.replace(/[^a-zA-Z0-9]/g, '_');
+                        const deptTotal = $deptRows.reduce((acc, g) => acc + g.total, 0);
+
+                        let deptDisplayRow = `<tr style="background-color: #f0f0f0;">
+                                                  <td class="ps-3 fw-bold text-nowrap">
+                                                      <button type="button" class="btn btn-sm btn-link p-0 me-2 dept-toggle-btn" data-dept-name="${deptKeyClean}">
+                                                          <i class="fas fa-plus dept-toggle-icon"></i>
+                                                      </button>
+                                                      Dept: ${escapeHtml(deptName)}
+                                                  </td>`;
                         
-                        let monthlyCombinedTotals = {};
-                        let yearlyCombinedTotals = {};
-                        
-                        monthKeys.forEach(function(k) {
-                            const itemVal = itemQtyDataCache[k] ? itemQtyDataCache[k].qty : 0;
-                            const budgetVal = budgetDataCache[k] ? budgetDataCache[k].budget : 0;
-                            monthlyCombinedTotals[k] = itemVal + budgetVal;
+                        displayKeys.forEach(function(key) {
+                            const type = key.split('|')[1] || 'total';
+                            const val = getDeptPivotTotal($deptRows, key, type);
+                            deptDisplayRow += `<td class="text-end fw-bold font-monospace ${getColorClass(val)}">${formatQty(val)}</td>`;
                         });
 
-                        yearlyKeys.forEach(function(yearlyKey) {
-                            const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
-                            const year = keyParts[0];
-                            const type = keyParts[1] || 'total';
-                            
-                            let totalItemForYear = Object.values(groups).reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
-                            let totalBudgetForYear = annualBudgetTotals[year] || 0;
-                            let totalVal = totalItemForYear + totalBudgetForYear;
-                            
-                            if (type === 'avg') {
-                                let distinctMonthsSet = {};
-                                Object.values(groups).forEach(g => {
-                                    Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
-                                });
-                                Object.keys(budgetDataCache).forEach(mkey => {
-                                    if (mkey.startsWith(year)) distinctMonthsSet[mkey] = true;
-                                });
-                                
-                                const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
-                                totalVal = distinctMonthsCount ? (totalVal / distinctMonthsCount) : 0;
-                            }
-                            yearlyCombinedTotals[yearlyKey] = totalVal;
-                        });
+                        const finalDeptTotal = (displayKeys.length === 0) ? deptTotal : deptTotal;
+                        deptDisplayRow += `<td class="text-end fw-bold font-monospace ${getColorClass(finalDeptTotal)}">${formatQty(finalDeptTotal)}</td></tr>`;
+                        tbodyHtml += deptDisplayRow;
 
-                        Object.keys(groups).forEach(function(remark) {
-                            const g = groups[remark];
-                            tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
-                            let rowTotal = 0;
+                        $deptRows.forEach(function(g) {
+                            let rowHtml = `<tr class="dept-remark-detail-row dept-detail-${deptKeyClean}" style="display:none; background-color: #ffffff;"><td class="ps-5" style="min-width:220px; font-style: italic; color: #555;">${escapeHtml(g.remark)}</td>`;
                             
-                            monthKeys.forEach(function(k) {
-                                const val = g.months[k] || 0;
-                                rowTotal += val;
-                                const cls = getColorClass(val); 
-                                tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
-                            });
+                            displayKeys.forEach(function(key) {
+                                let val = 0;
+                                const type = key.split('|')[1] || 'total';
 
-                            yearlyKeys.forEach(function(yearlyKey) {
-                                const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
-                                const year = keyParts[0];
-                                const type = keyParts[1] || 'total';
-                                const annualTotal = (g.annual_totals && g.annual_totals[year]) ? g.annual_totals[year] : 0;
-                                let val = annualTotal;
-                                if (type === 'avg') {
-                                    const distinctMonthsCount = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
-                                    val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
+                                if (key.startsWith('YEARLY-')) {
+                                    const year = key.replace('YEARLY-', '').split('|')[0];
+                                    const annualTotal = (g.annual_totals && g.annual_totals[year]) ? g.annual_totals[year] : 0;
+                                    val = annualTotal;
+                                    if (type === 'avg') {
+                                        const count = (g.annual_months_set && g.annual_months_set[year]) ? Object.keys(g.annual_months_set[year]).length : 0;
+                                        val = count ? (annualTotal / count) : 0;
+                                    }
+                                } else {
+                                    val = g.months[key] || 0;
                                 }
-                                
-                                const cls = getColorClass(val); 
-                                tbodyHtml += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
-                            });
-
-                            if (monthKeys.length === 0 && yearlyKeys.length > 0) {
-                                rowTotal = yearlyKeys.reduce((totalAcc, yk) => {
-                                     const yearOnly = yk.replace('YEARLY-', '').split('|')[0];
-                                     return totalAcc + (g.annual_totals[yearOnly] || 0); 
-                                }, 0);
-                            } else if (monthKeys.length === 0 && yearlyKeys.length === 0) {
-                                rowTotal = g.total;
-                            }
-                            
-                            tbodyHtml += '<td class="text-end fw-bold font-monospace ' + getColorClass(rowTotal) + '">' + formatQty(rowTotal) + '</td></tr>';
-                        });
-                        
-                        let itemQtyTotalRow = '<tr><td class="fw-bold">TOTAL ITEM QTY (MONTHS)</td>';
-                        
-                        monthKeys.forEach(function(k) {
-                            const val = itemQtyDataCache[k] ? itemQtyDataCache[k].qty : 0;
-                            itemQtyTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
-                        });
-                        
-                        yearlyKeys.forEach(function(yearlyKey) {
-                            const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
-                            const year = keyParts[0];
-                            const type = keyParts[1] || 'total';
-                            
-                            let annualTotal = Object.values(groups).reduce((acc, g) => acc + (g.annual_totals[year] || 0), 0);
-                            let val = annualTotal;
-
-                            if (type === 'avg') {
-                                let distinctMonthsSet = {};
-                                Object.values(groups).forEach(g => {
-                                    Object.keys(g.annual_months_set[year] || {}).forEach(m => distinctMonthsSet[m] = true);
-                                });
-                                const distinctMonthsCount = Object.keys(distinctMonthsSet).length;
-                                val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
-                            }
-                            itemQtyTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
-                        });
-                        
-                        itemQtyTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandItemQtyTotal)}">${formatQty(grandItemQtyTotal)}</td></tr>`;
-                        tbodyHtml += itemQtyTotalRow;
-
-
-                        if (grandBudgetTotal !== 0) {
-                            let budgetTotalRow = '<tr><td class="fw-bold text-nowrap">TOTAL BUDGET (MONTHS)</td>';
-                            
-                            monthKeys.forEach(function(k) {
-                                const val = budgetDataCache[k] ? budgetDataCache[k].budget : 0;
-                                const cls = getColorClass(val);
-                                budgetTotalRow += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
+                                rowHtml += `<td class="text-end font-monospace ${getColorClass(val)}">${formatQty(val)}</td>`;
                             });
                             
-                            yearlyKeys.forEach(function(yearlyKey) {
-                                const keyParts = yearlyKey.replace('YEARLY-', '').split('|');
-                                const year = keyParts[0];
-                                const type = keyParts[1] || 'total';
-                                const annualTotal = annualBudgetTotals[year] || 0;
-                                let val = annualTotal;
-                                if (type === 'avg') {
-                                    const distinctMonthsCount = (annualBudgetMonthsCount[year] ? Object.keys(annualBudgetMonthsCount[year]).length : 0);
-                                    val = distinctMonthsCount ? (annualTotal / distinctMonthsCount) : 0;
-                                }
-                                const cls = getColorClass(val);
-                                budgetTotalRow += '<td class="text-end font-monospace ' + cls + '">' + formatQty(val) + '</td>';
-                            });
-
-                            budgetTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandBudgetTotal)}">${formatQty(grandBudgetTotal)}</td></tr>`;
-                            tbodyHtml += budgetTotalRow;
-                        }
-
-
-                        let combinedTotalRow = '<tr><td class="fw-bold">Combined Monthly/Annual Total</td>';
-                        
-                        monthKeys.forEach(function(k) {
-                            const val = monthlyCombinedTotals[k] || 0;
-                            combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
+                            const finalRowTotal = g.total;
+                            rowHtml += `<td class="text-end fw-bold font-monospace ${getColorClass(finalRowTotal)}">${formatQty(finalRowTotal)}</td></tr>`;
+                            tbodyHtml += rowHtml;
                         });
-                        
-                        yearlyKeys.forEach(function(k) {
-                            const val = yearlyCombinedTotals[k] || 0;
-                            combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(val) + '">' + formatQty(val) + '</td>';
+                    });
+
+                    let tfootHtml = '';
+
+                    let itemQtyTotalRow = '<tr><td class="fw-bold">TOTAL ITEM QTY</td>';
+                    displayKeys.forEach(function(k) {
+                        const type = k.split('|')[1] || 'total';
+                        const val = getGrandPivotTotal(k, type, false);
+                        itemQtyTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(val)}">${formatQty(val)}</td>`;
+                    });
+                    itemQtyTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandItemQtyTotal)}">${formatQty(grandItemQtyTotal)}</td></tr>`;
+
+                    let budgetTotalRow = '';
+                    if (grandBudgetTotal !== 0) {
+                        budgetTotalRow = '<tr><td class="fw-bold text-nowrap">TOTAL BUDGET</td>';
+                        displayKeys.forEach(function(k) {
+                            const type = k.split('|')[1] || 'total';
+                            const val = getGrandPivotTotal(k, type, true);
+                            budgetTotalRow += `<td class="text-end font-monospace ${getColorClass(val)}">${formatQty(val)}</td>`;
                         });
-                        
-                        combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + getColorClass(grandCombinedTotal) + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
-                        
-                        const tableHtml = '<table id="detailTable" class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
-                        
-                        $('#detail-table-container').html(tableHtml);
-
-                    } else {
-                        let thead = '<tr><th>Remark / Source</th><th class="text-end">Total Qty</th></tr>';
-                        let tbodyHtml = '';
-                        
-                        Object.keys(groups).forEach(function(remark) {
-                            const g = groups[remark];
-                            const itemCls = getColorClass(g.total);
-                            tbodyHtml += '<tr><td style="min-width:220px; font-style: italic; color: #555;">' + escapeHtml(remark) + '</td>';
-                            tbodyHtml += '<td class="text-end fw-bold font-monospace ' + itemCls + '">' + formatQty(g.total) + '</td></tr>';
-                        });
-
-                        const grandItemQtyCls = getColorClass(grandItemQtyTotal);
-                        tbodyHtml += '<tr><td>TOTAL ITEM QTY (All Time)</td>';
-                        tbodyHtml += '<td class="text-end fw-bold font-monospace ' + grandItemQtyCls + '">' + formatQty(grandItemQtyTotal) + '</td></tr>';
-                        
-                        if (grandBudgetTotal !== 0) {
-                            const budgetCls = getColorClass(grandBudgetTotal);
-                            tbodyHtml += '<tr><td>Total Budget Allocated (ADDITION)</td>';
-                            tbodyHtml += '<td class="text-end fw-bold font-monospace ' + budgetCls + '">' + formatQty(grandBudgetTotal) + '</td></tr>';
-                        }
-
-                        const grandCls = getColorClass(grandCombinedTotal);
-                        let combinedTotalRow = '<tr><td>Combined Grand Total (All Time)</td>';
-                        combinedTotalRow += '<td class="text-end fw-bold font-monospace ' + grandCls + '">' + formatQty(grandCombinedTotal) + '</td></tr>';
-
-                        const tableHtml = '<table id="detailTable" class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot>' + combinedTotalRow + '</tfoot></table>';
-
-                        $('#detail-table-container').html(tableHtml);
+                        budgetTotalRow += `<td class="text-end fw-bold font-monospace ${getColorClass(grandBudgetTotal)}">${formatQty(grandBudgetTotal)}</td></tr>`;
                     }
+
+                    let combinedTotalRow = '<tr><td class="fw-bold bg-light">GRAND TOTAL</td>';
+                    displayKeys.forEach(function(k) {
+                        const type = k.split('|')[1] || 'total';
+                        const itemVal = getGrandPivotTotal(k, type, false);
+                        const budgetVal = getGrandPivotTotal(k, type, true);
+                        const val = itemVal + budgetVal;
+                        combinedTotalRow += `<td class="text-end fw-bold font-monospace bg-light ${getColorClass(val)}">${formatQty(val)}</td>`;
+                    });
+                    combinedTotalRow += `<td class="text-end fw-bold font-monospace bg-light ${totalColorClass}">${formatQty(grandCombinedTotal)}</td></tr>`;
+
+                    tfootHtml = itemQtyTotalRow + budgetTotalRow + combinedTotalRow;
+
+
+                    const tableHtml = '<table id="detailTable" class="table table-striped table-bordered table-sm mb-0"><thead class="sticky-top bg-light">' + thead + '</thead><tbody>' + tbodyHtml + '</tbody><tfoot class="bg-light">' + tfootHtml + '</tfoot></table>';
+                    
+                    $('#detail-table-container').html(tableHtml);
+
+                    $(document).off('click', '.dept-toggle-btn').on('click', '.dept-toggle-btn', function() {
+                        const deptName = $(this).data('dept-name');
+                        const $remarks = $('.dept-remark-detail-row.dept-detail-' + deptName); 
+                        const $icon = $(this).find('.dept-toggle-icon');
+                        
+                        if ($icon.hasClass('fa-minus')) {
+                            $remarks.hide();
+                            $icon.removeClass('fa-minus').addClass('fa-plus');
+                        } else {
+                            $remarks.show();
+                            $icon.removeClass('fa-plus').addClass('fa-minus');
+                        }
+                    });
+
                 } else {
                     const emptyHtml = '<div class="text-center text-muted p-3">Tidak ada transaksi detail maupun data budget yang ditemukan.</div>';
                     $('#detail-table-container').html(emptyHtml);
-                    $('#detail-total-info').text(formatQty(0)).removeClass('text-danger text-success').addClass('text-success');
                 }
                 
                 $('#detail-total-info').text(formatQty(grandCombinedTotal)).removeClass('text-danger text-success fw-bold').addClass(totalColorClass);
