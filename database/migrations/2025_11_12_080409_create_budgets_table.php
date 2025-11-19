@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('item_number');
             $table->string('item_description');
             $table->date('effective_date');
-            // Budget is a decimal value, similar to loc_qty_change in the items table
             $table->decimal('budget', 10, 2);
             $table->timestamps();
         });

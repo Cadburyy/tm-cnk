@@ -1,7 +1,6 @@
 @extends('layouts.app')
 
 @section('content')
-<<<<<<< HEAD
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Show Role</h2>
@@ -33,33 +32,6 @@
                     </div>
                 </div>
             </div>
-=======
-<div class="row mb-4">
-    <div class="col-lg-12 d-flex justify-content-between align-items-center">
-        <h2>Show Role</h2>
-        <a class="btn btn-primary" href="{{ route('roles.index') }}">Back</a>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12 mb-3">
-        <div class="form-group">
-            <strong>Name:</strong>
-            {{ $role->name }}
-        </div>
-    </div>
-
-    <div class="col-md-12">
-        <div class="form-group">
-            <strong>Permissions:</strong>
-            @if (!empty($rolePermissions))
-                @foreach ($rolePermissions as $permission)
-                    <span class="badge bg-success">{{ $permission->name }}</span>
-                @endforeach
-            @else
-                <span>No permissions assigned.</span>
-            @endif
->>>>>>> 5aa1b22209bd856f792520ff8474479260a2d9d6
         </div>
     </div>
 </div>
