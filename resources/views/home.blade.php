@@ -140,7 +140,7 @@
 
     <div class="row justify-content-center">
         <div class="col-12 text-center mb-4">
-            <h3 class="text-primary-dark">Item Transaction & Budget Analysis Dashboard</h3>
+            <h3 class="text-primary-dark">Dashboard Transaksi Pemakaian Item & Budget Analysis</h3>
         </div>
         
             <div class="card shadow-sm prefix-key-table mb-4">
@@ -243,7 +243,7 @@
                 <div class="chart-container" style="height: 400px;">
                     <canvas id="barChart"></canvas>
                 </div>
-                <p class="mt-3 small text-muted text-center">Kuantitas Item (Qty) [Absolut] vs. Budget (per bulan).</p>
+                <p class="mt-3 small text-muted text-center">Pemakaian Item vs. Budget (per bulan).</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -276,8 +276,8 @@
     };
     
     const tooltipFraudItems = {
-        'Surplus/Healthy': 'Total surplus items (Qty + Budget > 0)',
-        'Defisit/Fraud': 'Total deficit items (Qty + Budget < 0)',
+        'Surplus/Healthy': 'Total surplus items (Pemakaian < Budget)',
+        'Defisit/Fraud': 'Total deficit items (Pemakaian > Budget)',
     };
 
     let currentBarChart = null;
@@ -323,7 +323,7 @@
                         yAxisID: 'y',
                     },
                     {
-                        label: 'Budget Allocated',
+                        label: 'Budget',
                         data: budgetData,
                         backgroundColor: '#28a745', 
                         yAxisID: 'y',
@@ -338,7 +338,7 @@
                     y: { 
                         stacked: false,
                         beginAtZero: true,
-                        title: { display: true, text: 'Kuantitas/Budget' },
+                        title: { display: true, text: 'Pemakaian/Budget' },
                         ticks: {
                             callback: function(value) {
                                 return value.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
