@@ -94,10 +94,21 @@
     }
 </style>
 
-<div class="container d-flex flex-column justify-content-center py-5">
-    <h2 class="text-center mb-5">Welcome, {{ $user->name }}</h2>
-    
-    <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mt-3 mb-5">
+        <div class="container d-flex flex-column justify-content-center py-5">
+        
+        <h2 class="text-center mb-1">
+            Welcome, {{ $user->name }} 
+            <span role="img" aria-label="wave">👋</span>
+        </h2>
+        
+        @if($latestUpdateDate)
+            <p class="text-center">
+                Update Data Terbaru: 
+                <strong class="text-primary">{{ $latestUpdateDate }}</strong>
+            </p>
+        @endif
+
+        <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mt-3 mb-5">
         <div class="col-md-4">
             <a href="{{ route('items.index') }}" class="text-decoration-none card-link-hover">
                 <div class="card h-100 text-center shadow-sm p-3">

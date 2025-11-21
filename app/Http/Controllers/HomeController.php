@@ -49,6 +49,12 @@ class HomeController extends Controller
         $monthlyData = [];
         $prefixes = [];
 
+        $latestUpdateDate = Item::max('effective_date');
+
+        if ($latestUpdateDate) {
+            $latestUpdateDate = Carbon::parse($latestUpdateDate)->format('d/m/Y');
+        }
+
         foreach ($itemNumbers as $itemNumber) {
             $qty = $itemAggregates[$itemNumber] ?? 0;
             $budget = $budgetAggregates[$itemNumber] ?? 0;
@@ -101,6 +107,7 @@ class HomeController extends Controller
             'dashboardData' => array_values($dashboardData),
             'monthlyDataJson' => json_encode($monthlyData),
             'prefixes' => array_keys($prefixes),
+            'latestUpdateDate' => $latestUpdateDate,
         ]);
     }
 }
