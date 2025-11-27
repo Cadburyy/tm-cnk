@@ -23,7 +23,7 @@
     <form method="GET" action="{{ route('items.index') }}" class="row mb-4" id="filterForm">
         <div class="col-12">
             <div class="card shadow-sm">
-                <div class="card-header bg-light fw-bold">Pilihan Filter Data Barang</div>
+                <div class="card-header bg-light fw-bold">Filter Data Barang</div>
                 <div class="card-body">
                     @if ($mode == 'details')
                         <div class="row g-3 mb-2">
@@ -69,7 +69,7 @@
                     @else
                         <div class="row g-3">
                             <div class="col-lg-6 col-md-12">
-                                <label class="form-label fw-bold">Yearly (Total / Rata-rata)</label>
+                                <label class="form-label fw-bold">Yearly</label>
                                 <div class="card p-3 h-100">
                                     <div class="mb-2">
                                         <label class="form-label small mb-1">Pilih Tahun</label>
@@ -95,17 +95,16 @@
                                             <option value="total" {{ (isset($yearly_mode) && $yearly_mode == 'total') ? 'selected' : '' }}>Total</option>
                                             <option value="avg" {{ (isset($yearly_mode) && $yearly_mode == 'avg') ? 'selected' : '' }}>Rata-rata</option>
                                         </select>
-                                        <div class="small text-muted mt-1">Pilih menampilkan Total atau Rata-rata untuk tahun yang dipilih.</div>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="col-lg-6 col-md-12">
-                                <label class="form-label fw-bold">Monthly (Pilih Bulan per Tahun)</label>
+                                <label class="form-label fw-bold">Monthly</label>
                                 <div class="card p-3 h-100">
                                     <div class="row">
                                         <div class="col-5">
-                                            <label class="form-label small mb-1">Pilih Tahun (untuk Bulanan)</label>
+                                            <label class="form-label small mb-1">Pilih Tahun</label>
                                             <div class="dropdown" id="monthlyYearsDropdown">
                                                 <button class="btn btn-outline-secondary btn-sm w-100 text-start dropdown-toggle" type="button" id="monthlyYearsBtn" data-bs-toggle="dropdown" aria-expanded="false">
                                                     <span id="monthlyYearsLabel">Pilih Tahun</span>
@@ -122,7 +121,7 @@
                                             </div>
                                         </div>
                                         <div class="col-7">
-                                            <label class="form-label small mb-1">Pilih Bulan (per tahun)</label>
+                                            <label class="form-label small mb-1">Pilih Bulan</label>
                                             <div id="monthlyMonthsContainer" class="p-1" style="max-height:160px; overflow:auto; border:1px solid #e9ecef; border-radius:4px;">
                                                 @foreach($distinctYearMonths as $yr => $mList)
                                                     <div class="monthly-year-group mb-2" data-year="{{ $yr }}" style="display:none;">
@@ -144,7 +143,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="row g-3 mt-3">
+                        <div class="row g-3 mt-4">
                             <div class="col-lg-4">
                                 <label class="form-label">Item Number</label>
                                 <input list="itemNumbers" name="item_number_term" id="item-number-input"
@@ -354,17 +353,8 @@
                                         @php
                                             $deptTotalRaw = (int) ($row['total'] ?? 0);
                                         @endphp
-                                        <tr class="item-dept-detail-row item-number-{{ $itemNumber }}" style="display:none; background-color: #ffffff;">
-                                            <td class="text-center" style="width:30px;">
-                                                <button type="button" class="btn btn-sm btn-outline-primary show-dept-detail-btn"
-                                                    data-dept-row-id="{{ $row['row_ids'] }}"
-                                                    data-dept-item-key="{{ $row['item_number'] }}||{{ $row['item_description'] }}||{{ $row['unit_of_measure'] }}||{{ $row['dept'] }}"
-                                                    title="Klik untuk lihat detail department">
-                                                    <i class="fas fa-search-plus"></i>
-                                                </button>
-                                            </td>
-
-                                            <td colspan="2" class="ps-5 text-nowrap small text-muted">
+                                        <tr class="item-dept-detail-row item-number-{{ $itemNumber }}" style="display:none; background-color: #ffffff;">                                                                                
+                                            <td colspan="3" class="ps-5 text-nowrap small text-muted">
                                                 DEPT: <span class="fw-bold text-dark">{{ $row['dept'] }}</span>
                                                 <span class="badge bg-secondary ms-2">{{ count(explode(',', $row['row_ids'])) }} records</span>
                                             </td>
@@ -425,7 +415,7 @@
     </div>
 
     <div class="modal fade" id="pivotDetailModal" tabindex="-1" aria-labelledby="pivotDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl"> 
+        <div class="modal-dialog modal-dialog-centered modal-xl"> 
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
                     <h5 class="modal-title" id="pivotDetailModalLabel">Detail Transaksi Item + Budget</h5>
@@ -441,7 +431,6 @@
                     <div id="detail-content" style="display: none;">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
-                                <p class="fw-bold mb-1">Item:</p>
                                 <p class="mb-2 ps-2" id="detail-item-info"></p>
                                 <p class="fw-bold mb-1">Total Pemakaian + Budget:</p>
                                 <p class="mb-0 ps-2 fw-bold" id="detail-total-info"></p>

@@ -133,6 +133,17 @@
                 </div>
             </a>
         </div>
+        <div class="col-md-4">
+            <a href="{{ route('outings.index') }}" class="text-decoration-none card-link-hover">
+                <div class="card h-100 text-center shadow-sm p-3">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                        <i class="fas fa-file-invoice-dollar fa-3x mb-2 text-success"></i>
+                        <h5 class="card-title"><strong>Manage Outing</strong></h5>
+                        <p class="card-text text-muted"><strong>Track spending and manage allocations.</strong></p>
+                    </div>
+                </div>
+            </a>
+        </div>
         @endhasanyrole
     </div>
 

@@ -22,12 +22,12 @@
     <form method="GET" action="{{ route('budget.index') }}" class="row mb-4" id="filterForm">
         <div class="col-12">
             <div class="card shadow-sm">
-                <div class="card-header bg-light fw-bold">Pilihan Filter Data Budget</div>
+                <div class="card-header bg-light fw-bold">Filter Data Budget</div>
                 <div class="card-body">
                     <div class="row g-3 mb-4">
 
                         <div class="col-lg-6 col-md-12">
-                            <label class="form-label fw-bold">Yearly (Total / Rata-rata)</label>
+                            <label class="form-label fw-bold">Yearly</label>
                             <div class="card p-3 h-100">
                                 <div class="mb-2">
                                     <label class="form-label small mb-1">Pilih Tahun</label>
@@ -52,17 +52,16 @@
                                         <option value="total">Total</option>
                                         <option value="avg">Rata-rata</option>
                                     </select>
-                                    <div class="small text-muted mt-1">Menampilkan Total atau Rata-rata budget tahunan.</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="col-lg-6 col-md-12">
-                            <label class="form-label fw-bold">Monthly (Pilih Bulan per Tahun)</label>
+                            <label class="form-label fw-bold">Monthly</label>
                             <div class="card p-3 h-100">
                                 <div class="row">
                                     <div class="col-5">
-                                        <label class="form-label small mb-1">Pilih Tahun (untuk Bulanan)</label>
+                                        <label class="form-label small mb-1">Pilih Tahun</label>
                                         <div class="dropdown" id="monthlyYearsDropdown">
                                             <button class="btn btn-outline-secondary btn-sm w-100 text-start dropdown-toggle" type="button" id="monthlyYearsBtn" data-bs-toggle="dropdown" aria-expanded="false">
                                                 <span id="monthlyYearsLabel">Pilih Tahun</span>
@@ -78,7 +77,7 @@
                                         </div>
                                     </div>
                                     <div class="col-7">
-                                        <label class="form-label small mb-1">Pilih Bulan (per tahun)</label>
+                                        <label class="form-label small mb-1">Pilih Bulan</label>
                                         <div id="monthlyMonthsContainer" class="p-1" style="max-height:160px; overflow:auto; border:1px solid #e9ecef; border-radius:4px;">
                                             @foreach($distinctYearMonths as $yr => $mList)
                                                 <div class="monthly-year-group mb-2" data-year="{{ $yr }}" style="display:none;">
@@ -102,7 +101,7 @@
                     </div>
 
                     <div class="row g-3 mt-3">
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <label class="form-label">Item Number</label>
                             <input list="itemNumbers" name="item_number_term" id="item-number-input"
                                 class="form-control form-control-sm" value="{{ $item_number_term }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
@@ -112,7 +111,7 @@
                                 @endforeach
                             </datalist>
                         </div>
-                        <div class="col-lg-3 col-md-6">
+                        <div class="col-lg-6 col-md-6">
                             <label class="form-label">Item Description</label>
                             <input type="text" name="item_description_term" class="form-control form-control-sm" value="{{ $item_description_term ?? '' }}" autocomplete="off" oninput="this.value = this.value.toUpperCase()">
                         </div>
@@ -198,7 +197,7 @@
     </form>
 
     <div class="modal fade" id="uploadCsvModal" tabindex="-1" aria-labelledby="uploadCsvModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="uploadCsvModalLabel">Unggah File CSV Budget Baru</h5>
