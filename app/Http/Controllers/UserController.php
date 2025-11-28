@@ -10,9 +10,22 @@ use Hash;
 use Illuminate\Support\Arr;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
+
+    private function checkAdminITProtection(User $targetUser): ?RedirectResponse
+    {
+        if (Auth::user()->hasRole('Admin')) {
+            if ($targetUser->hasRole('AdminIT')) {
+                return redirect()->route('users.index')
+                    ->with('error', 'The Admin role is not permitted to modify or delete users with the AdminIT role.');
+            }
+        }
+        return null;
+    }
+
     public function index(Request $request): View
     {
         $data = User::latest()->paginate(5);
@@ -51,9 +64,14 @@ class UserController extends Controller
         return view('users.show', compact('user'));
     }
 
-    public function edit($id): View
+    public function edit($id): View|RedirectResponse
     {
         $user = User::find($id);
+
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+
         $roles = Role::pluck('name', 'name')->all();
         $userRole = $user->roles->pluck('name', 'name')->all();
         return view('users.edit', compact('user', 'roles', 'userRole'));
@@ -61,10 +79,16 @@ class UserController extends Controller
 
     public function update(Request $request, $id): RedirectResponse
     {
+        $user = User::find($id);
+
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+        
         $this->validate($request, [
             'name' => 'required',
             'email' => 'required|email|unique:users,email,' . $id,
-            'password' => 'same:confirm-password',
+            'password' => 'nullable|same:confirm-password',
             'roles' => 'required'
         ]);
 
@@ -75,7 +99,6 @@ class UserController extends Controller
             $input = Arr::except($input, array('password'));
         }
 
-        $user = User::find($id);
         $user->update($input);
         DB::table('model_has_roles')->where('model_id', $id)->delete();
 
@@ -87,7 +110,14 @@ class UserController extends Controller
 
     public function destroy($id): RedirectResponse
     {
-        User::find($id)->delete();
+        $user = User::find($id);
+
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+        
+        $user->delete();
+        
         return redirect()->route('users.index')
             ->with('success', 'User deleted successfully');
     }

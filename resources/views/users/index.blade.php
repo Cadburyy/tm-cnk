@@ -59,6 +59,12 @@
         </div>
     @endsession
 
+    @session('error')
+        <div class="alert alert-danger rounded-3 shadow-sm" role="alert"> 
+            {{ $value }}
+        </div>
+    @endsession
+
     <div class="card shadow-sm mb-4">
         <div class="card-header card-header-custom">
             <h5 class="mb-0">Users List</h5>
