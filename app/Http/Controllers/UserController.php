@@ -10,9 +10,28 @@ use Hash;
 use Illuminate\Support\Arr;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth; // Added Auth facade
 
 class UserController extends Controller
 {
+    /**
+     * Helper function to implement the specific AdminIT protection rule.
+     * Denies an 'Admin' from modifying or deleting an 'AdminIT' user.
+     */
+    private function checkAdminITProtection(User $targetUser): ?RedirectResponse
+    {
+        // Check if the currently authenticated user is 'Admin'
+        if (Auth::user()->hasRole('Admin')) {
+            // Check if the target user has the 'AdminIT' role
+            if ($targetUser->hasRole('AdminIT')) {
+                // If an Admin tries to modify an AdminIT user, deny access
+                return redirect()->route('users.index')
+                    ->with('error', 'The Admin role is not permitted to modify or delete users with the AdminIT role.');
+            }
+        }
+        return null; // Proceed with the action
+    }
+
     public function index(Request $request): View
     {
         $data = User::latest()->paginate(5);
@@ -51,9 +70,15 @@ class UserController extends Controller
         return view('users.show', compact('user'));
     }
 
-    public function edit($id): View
+    public function edit($id): View|RedirectResponse // Updated return type to include RedirectResponse
     {
         $user = User::find($id);
+
+        // Custom check: Prevent Admin from editing AdminIT
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+
         $roles = Role::pluck('name', 'name')->all();
         $userRole = $user->roles->pluck('name', 'name')->all();
         return view('users.edit', compact('user', 'roles', 'userRole'));
@@ -61,10 +86,17 @@ class UserController extends Controller
 
     public function update(Request $request, $id): RedirectResponse
     {
+        $user = User::find($id); // Fetch user before validation for the protection check
+
+        // Custom check: Prevent Admin from updating AdminIT
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+        
         $this->validate($request, [
             'name' => 'required',
             'email' => 'required|email|unique:users,email,' . $id,
-            'password' => 'same:confirm-password',
+            'password' => 'nullable|same:confirm-password', // Changed to nullable
             'roles' => 'required'
         ]);
 
@@ -75,7 +107,6 @@ class UserController extends Controller
             $input = Arr::except($input, array('password'));
         }
 
-        $user = User::find($id);
         $user->update($input);
         DB::table('model_has_roles')->where('model_id', $id)->delete();
 
@@ -87,7 +118,15 @@ class UserController extends Controller
 
     public function destroy($id): RedirectResponse
     {
-        User::find($id)->delete();
+        $user = User::find($id);
+
+        // Custom check: Prevent Admin from deleting AdminIT
+        if ($response = $this->checkAdminITProtection($user)) {
+            return $response;
+        }
+        
+        $user->delete(); // Use the fetched user object to delete
+        
         return redirect()->route('users.index')
             ->with('success', 'User deleted successfully');
     }
