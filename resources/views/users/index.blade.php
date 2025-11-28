@@ -58,8 +58,7 @@
             {{ $value }}
         </div>
     @endsession
-    
-    {{-- Added session error handling --}}
+
     @session('error')
         <div class="alert alert-danger rounded-3 shadow-sm" role="alert"> 
             {{ $value }}
