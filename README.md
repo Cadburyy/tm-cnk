@@ -1,44 +1,67 @@
-# Transaction Management (TM) — Setup
+⚙️ Project Setup Guide
+This guide will walk you through setting up the Transaction Management (TM) application.
 
-# 1. Go to your project directory
+1. Environment and Dependencies
+Ensure you have PHP (with Composer) and Node.js (with npm) installed.
+
+Go to your project directory:
+
+Bash
+
 cd path/to/tm
+Install PHP dependencies:
 
-# 2. Install backend dependencies
+Bash
+
 composer install
+Prepare the environment file:
 
-# 3. Copy environment file
+Bash
+
 cp .env.example .env
+Generate the application key:
 
-# 4. Generate Laravel app key
+Bash
+
 php artisan key:generate
+2. Database Configuration
+Create your database (e.g., tm_db) in your database manager (like phpMyAdmin).
 
-########################################
-# 5. Create your database in phpMyAdmin:
-#    Database name example: tm_db
-#
-# Then update .env with:
-#    DB_DATABASE=tm_db
-#    DB_USERNAME=root
-#    DB_PASSWORD=
-########################################
+Update your .env file with the correct connection details:
 
-# 6. Run migrations and seed roles/users
-php artisan migrate:fresh
-php artisan db:seed
+Code snippet
 
-# 7. Install frontend dependencies
+# .env File Snippet
+DB_DATABASE=tm_db
+DB_USERNAME=root
+DB_PASSWORD=
+Run migrations and seed the database (this resets all tables):
+
+Bash
+
+php artisan migrate:fresh --seed
+3. Frontend Setup and Build
+Install Node dependencies:
+
+Bash
+
 npm install
+Build frontend assets for production:
 
-# 8. Build frontend assets
+Bash
+
 npm run build
+4. Running the Application
+You must run the backend and the frontend processes simultaneously in two separate terminals.
 
-# 9. Start Laravel server
+Terminal 1: Start Laravel server:
+
+Bash
+
 php artisan serve
+Terminal 2: Start Vite development server:
 
-# 10. Open a NEW terminal and start Vite
+Bash
+
 npm run dev
-
-########################################
-# Application will run at:
-# http://localhost:8000
-########################################
+The application will be running at: http://localhost:8000
