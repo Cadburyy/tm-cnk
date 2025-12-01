@@ -1,67 +1,36 @@
-⚙️ Project Setup Guide
-This guide will walk you through setting up the Transaction Management (TM) application.
-
-1. Environment and Dependencies
-Ensure you have PHP (with Composer) and Node.js (with npm) installed.
-
-Go to your project directory:
-
-Bash
-
+# --- 1. SETUP: GO TO PROJECT DIRECTORY ---
 cd path/to/tm
-Install PHP dependencies:
 
-Bash
-
+# --- 2. INSTALL BACKEND DEPENDENCIES ---
 composer install
-Prepare the environment file:
 
-Bash
-
+# --- 3. CONFIGURE ENVIRONMENT FILE ---
 cp .env.example .env
-Generate the application key:
 
-Bash
-
+# --- 4. GENERATE LARAVEL APPLICATION KEY ---
 php artisan key:generate
-2. Database Configuration
-Create your database (e.g., tm_db) in your database manager (like phpMyAdmin).
 
-Update your .env file with the correct connection details:
+# --- 5. DATABASE CONFIGURATION (REQUIRES MANUAL DB CREATION FIRST) ---
+# NOTE: Before running the next step, you must manually create the database.
+# Example command to update .env after creating 'tm_db' in phpMyAdmin:
+# sed -i 's/DB_DATABASE=laravel/DB_DATABASE=tm_db/' .env
+# sed -i 's/DB_USERNAME=root/DB_USERNAME=root/' .env
+# sed -i 's/DB_PASSWORD=/DB_PASSWORD=/' .env
 
-Code snippet
-
-# .env File Snippet
-DB_DATABASE=tm_db
-DB_USERNAME=root
-DB_PASSWORD=
-Run migrations and seed the database (this resets all tables):
-
-Bash
-
+# --- 6. RUN MIGRATIONS AND SEED INITIAL DATA ---
 php artisan migrate:fresh --seed
-3. Frontend Setup and Build
-Install Node dependencies:
 
-Bash
-
+# --- 7. INSTALL FRONTEND DEPENDENCIES ---
 npm install
-Build frontend assets for production:
 
-Bash
-
+# --- 8. BUILD FRONTEND ASSETS ---
 npm run build
-4. Running the Application
-You must run the backend and the frontend processes simultaneously in two separate terminals.
 
-Terminal 1: Start Laravel server:
+# --- 9. START LARAVEL SERVER (NEEDS SEPARATE TERMINAL) ---
+# php artisan serve
 
-Bash
+# --- 10. START VITE SERVER (NEEDS ANOTHER SEPARATE TERMINAL) ---
+# npm run dev
 
-php artisan serve
-Terminal 2: Start Vite development server:
-
-Bash
-
-npm run dev
-The application will be running at: http://localhost:8000
+# --- ACCESS: http://localhost:8000 ---
+echo "Setup steps completed. You must now run 'php artisan serve' and 'npm run dev' in separate terminals."
