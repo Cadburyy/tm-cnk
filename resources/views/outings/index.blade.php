@@ -57,7 +57,7 @@
                     @else
                         <div class="row g-3">
                             <div class="col-lg-6 col-md-12">
-                                <label class="form-label fw-bold">Yearly</label>
+                                <label class="form-label fw-bold">Yearly (Total Only)</label>
                                 <div class="card p-3 h-100">
                                     <div class="mb-2">
                                         <label class="form-label small mb-1">Pilih Tahun</label>
@@ -75,14 +75,6 @@
                                                 @endforeach
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="mt-2">
-                                        <label class="form-label small mb-1">Mode</label>
-                                        <select id="yearlyMode" class="form-control form-control-sm" name="yearly_mode">
-                                            <option value="">-- Pilih Mode --</option>
-                                            <option value="total">Total</option>
-                                            <option value="avg">Rata-rata</option>
-                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -311,16 +303,12 @@
                                     @endphp
 
                                     @foreach($accountBreakdown as $akunKey => $accRows)
-                                        @php
-                                            $accTotal = $accRows->sum('total');
-                                            $accNamePT = $accRows->first()['nama_pt']; 
-                                        @endphp
                                         <tr class="child-row child-{{ $uniqueId }}" style="display:none; background-color: #fff;">
                                             <td></td>
                                             <td class="ps-4">
                                                 <span class="badge bg-secondary me-2">Akun</span> 
                                                 <span class="fw-bold text-dark">{{ $akunKey }}</span>
-                                                <span class="text-muted small ms-2">({{ $accNamePT }})</span>
+                                                <span class="text-muted small ms-2">({{ $accRows->first()['nama_pt'] }})</span>
                                             </td>
                                             
                                             @if (count($months) > 0)
@@ -337,7 +325,7 @@
                                             @endif
 
                                             <td class="text-end font-monospace small text-dark fw-bold">
-                                                {{ number_format($accTotal, 2, ',', '.') }}
+                                                {{ number_format($accRows->sum('total'), 2, ',', '.') }}
                                             </td>
                                         </tr>
                                     @endforeach
@@ -368,11 +356,18 @@
                     <div id="detail-content" style="display: none;">
                         <div class="mb-3">
                         </div>
+                        
+                        <div id="monthly-subtotals-container" class="mb-3 p-3 bg-white border rounded">
+                            <h6 class="fw-bold mb-2 text-info"><i class="fas fa-calendar-alt me-1"></i> Monthly Subtotals (Filtered)</h6>
+                            <div id="monthly-subtotals-list" class="d-flex flex-wrap gap-3">
+                            </div>
+                        </div>
+                        
                         <div class="table-responsive" style="max-height: 50vh;">
                             <div id="detail-table-container"></div>
                         </div>
                         <div class="mt-3 text-end border-top pt-2">
-                             <h5>Total Nominal: <span id="modal-total-nominal" class="fw-bold font-monospace"></span></h5>
+                            <h5>Total Nominal: <span id="modal-total-nominal" class="fw-bold font-monospace"></span></h5>
                         </div>
                     </div>
                 </div>
@@ -454,6 +449,14 @@
         }
         return datePart;
     }
+    
+    function formatMonthYear(ymString) {
+        if (!ymString || ymString.length !== 7) return ymString;
+        const [year, month] = ymString.split('-');
+        const date = new Date(year, month - 1, 1);
+        const options = { month: 'short', year: 'numeric' };
+        return date.toLocaleDateString('id-ID', options);
+    }
 
     $(function() {
         const selectedPivot = @json($raw_selections ?? []);
@@ -478,8 +481,8 @@
             (function syncFromServerPivot() {
                 selectedPivot.forEach(function(p) {
                     if (String(p).startsWith('YEARLY-')) {
-                        const parts = String(p).replace('YEARLY-','').split('|');
-                        $('#year_yearly_' + parts[0]).prop('checked', true);
+                        const year = String(p).replace('YEARLY-','').split('|')[0];
+                        $('#year_yearly_' + year).prop('checked', true);
                     } else if (/^\d{4}-\d{2}$/.test(String(p))) {
                         const year = String(p).slice(0,4);
                         $('#month_' + p).prop('checked', true);
@@ -517,9 +520,8 @@
         function rebuildPivotHiddenInputs() {
             $('input[name="pivot_months[]"]', '#filterForm').remove();
             const yearlyYears = $('.yearly-year-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
-            const yearlyMode = $('#yearlyMode').val() || 'total';
             yearlyYears.forEach(function(y) {
-                $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: 'YEARLY-' + y + '|' + yearlyMode}).appendTo('#filterForm');
+                $('<input>').attr({type: 'hidden', name: 'pivot_months[]', value: 'YEARLY-' + y + '|total'}).appendTo('#filterForm');
             });
             const monthly = $('.monthly-month-checkbox:checked').map(function(){ return $(this).val(); }).get() || [];
             monthly.forEach(function(ym) {
@@ -546,29 +548,55 @@
             e.stopPropagation();
         });
 
-        // Modal Logic with Structured Content
         $(document).on('click', '.parent-row', function(e) {
             if ($(e.target).closest('.toggle-child-btn').length) return;
 
             const row = $(this);
             const idList = row.data('id-list');
             
+            const pivotSelections = $('input[name="pivot_months[]"]').map(function(){
+                return $(this).val();
+            }).get();
+
             $('#pivotDetailModal').modal('show');
             $('#detail-content').hide();
             $('#detail-loading').show();
+            $('#monthly-subtotals-list').empty();
 
             $.ajax({
                 url: '{{ route("outings.index") }}',
-                data: { action: 'pivot_row_details', id_list: idList },
+                data: { 
+                    action: 'pivot_row_details', 
+                    id_list: idList,
+                    pivot_months: pivotSelections
+                },
                 success: function(res) {
                     $('#detail-loading').hide();
                     $('#detail-content').show();
                     $('#modal-total-nominal').text(formatNominalJS(res.total_nominal));
 
+                    if (res.monthly_subtotals && Object.keys(res.monthly_subtotals).length > 0) {
+                        let subtotalsHtml = '';
+                        for (const ym in res.monthly_subtotals) {
+                            if (res.monthly_subtotals.hasOwnProperty(ym)) {
+                                const nominal = res.monthly_subtotals[ym];
+                                const monthLabel = formatMonthYear(ym);
+                                subtotalsHtml += `
+                                    <div class="p-2 border rounded shadow-sm" style="background-color: #f7f7f7;">
+                                        <div class="small text-muted fw-bold">${monthLabel}</div>
+                                        <div class="fw-bold font-monospace text-dark" style="font-size:0.9em;">${formatNominalJS(nominal)}</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                        $('#monthly-subtotals-list').html(subtotalsHtml);
+                    } else {
+                        $('#monthly-subtotals-list').html('<div class="text-muted small">No monthly breakdowns found for selected period.</div>');
+                    }
+                    
                     if(res.details && res.details.length > 0) {
                         const first = res.details[0];
                         
-                        // Structure Header Content
                         let headerHtml = `
                             <div class="card bg-light mb-3 border-0">
                                 <div class="card-body py-2">
@@ -585,9 +613,8 @@
                                 </div>
                             </div>
                         `;
-                        $('#detail-content .mb-3').html(headerHtml);
+                        $('#detail-content .mb-3:first').html(headerHtml);
 
-                        // Structure Table Content (Simplified)
                         let html = '<table class="table table-sm table-striped table-bordered mb-0"><thead><tr class="bg-white"><th>Tanggal</th><th>Voucher</th><th>Akun</th><th>Nama</th><th>Nama PT</th><th class="text-end">Nominal</th></tr></thead><tbody>';
                         res.details.forEach(d => {
                             html += `<tr>
@@ -609,11 +636,11 @@
                     $('#detail-loading').hide();
                     $('#detail-content').show();
                     $('#detail-table-container').html('<div class="text-danger text-center">Failed to load details.</div>');
+                    $('#monthly-subtotals-list').html('<div class="text-danger small">Failed to load monthly subtotals.</div>');
                 }
             });
         });
 
-        // Select All Checkbox Logic (Fixed)
         $('#select-all-details').on('click', function() {
             $('.select-detail').prop('checked', $(this).is(':checked'));
         });
@@ -632,8 +659,8 @@
             e.preventDefault();
             const selected = $('.select-detail:checked').map(function(){ return $(this).val(); }).get();
             if (selected.length === 0) {
-                alert('Pilih setidaknya satu baris untuk dihapus.');
-                return;
+                console.warn('Pilih setidaknya satu baris untuk dihapus.');
+                return; 
             }
             $('#bulkDeleteIdsContainer').empty();
             selected.forEach(function(val) {

@@ -13,6 +13,7 @@ class OutingController extends Controller
     {
         if ($request->ajax() && $request->get('action') === 'pivot_row_details') {
             $id_list = $request->get('id_list');
+            $pivotSelections = $request->get('pivot_months', []);
             if (empty($id_list)) return response()->json(['details' => []]);
 
             $ids = array_filter(array_map('trim', explode(',', $id_list)));
@@ -22,9 +23,27 @@ class OutingController extends Controller
             
             $total_nominal = $details->sum('nominal');
 
+            $selected_months = collect($pivotSelections)
+                ->filter(fn($s) => preg_match('/^\d{4}-\d{2}$/', $s))
+                ->values()
+                ->toArray();
+
+            $monthly_subtotals = $details->groupBy(function($item) {
+                return Carbon::parse($item->tanggal)->format('Y-m');
+            })->map(function($group) {
+                return $group->sum('nominal');
+            });
+            
+            $monthly_subtotals = $monthly_subtotals->filter(function ($value, $key) use ($selected_months) {
+                return in_array($key, $selected_months);
+            });
+
+            $monthly_subtotals = $monthly_subtotals->sortKeysDesc(); 
+
             return response()->json([
                 'details' => $details,
-                'total_nominal' => $total_nominal
+                'total_nominal' => $total_nominal,
+                'monthly_subtotals' => $monthly_subtotals,
             ]);
         }
 
@@ -65,11 +84,13 @@ class OutingController extends Controller
             $raw_selections = array_filter((array)$raw_selections);
             foreach ($raw_selections as $selection) {
                 if (str_starts_with($selection, 'YEARLY-')) {
-                    $selected_yearly[] = str_replace('YEARLY-', '', $selection);
+                    $year = explode('|', str_replace('YEARLY-', '', $selection))[0];
+                    $selected_yearly[] = $year;
                 } else {
                     $selected_months[] = $selection;
                 }
             }
+            $selected_yearly = array_unique($selected_yearly);
         }
 
         $query = Outing::query();
@@ -96,8 +117,7 @@ class OutingController extends Controller
                     foreach ($selected_months as $ym) {
                         $q->orWhere('tanggal', 'LIKE', $ym . '-%');
                     }
-                    foreach ($selected_yearly as $yearEntry) {
-                        $year = explode('|', $yearEntry)[0];
+                    foreach ($selected_yearly as $year) {
                         $q->orWhereYear('tanggal', $year);
                     }
                 });
@@ -111,14 +131,10 @@ class OutingController extends Controller
 
         if ($mode == 'resume') {
             $final_months = [];
-            $yearly_mode = $request->input('yearly_mode', 'total'); 
-
-            foreach ($selected_yearly as $yearEntry) {
-                $parts = explode('|', $yearEntry);
-                $year = $parts[0];
-                $type = $parts[1] ?? $yearly_mode; 
-                $key = "YEARLY-{$year}|{$type}";
-                $label = ($type === 'avg') ? "Avg " . substr($year, 2, 2) : "Total " . $year;
+            
+            foreach ($selected_yearly as $year) {
+                $key = "YEARLY-{$year}|total";
+                $label = "Total " . $year;
                 $final_months[$key] = ['key' => $key, 'label' => $label, 'type' => 'yearly', 'year' => $year];
             }
 
@@ -136,7 +152,6 @@ class OutingController extends Controller
                 $year = Carbon::parse($out->tanggal)->format('Y');
                 $month_year = Carbon::parse($out->tanggal)->format('Y-m');
                 
-                // Keep granular grouping for calculation correctness
                 $part = $out->part ?? 'NA';
                 $ket = $out->keterangan ?? 'NA';
                 $akun = $out->akun ?? 'NA';
@@ -169,22 +184,12 @@ class OutingController extends Controller
             }
 
             foreach ($summary_rows as $key => $row) {
-                foreach ($selected_yearly as $yearEntry) {
-                    $parts = explode('|', $yearEntry);
-                    $year = $parts[0];
-                    $type = $parts[1] ?? $yearly_mode;
+                foreach ($selected_yearly as $year) {
                     $annual_total = $row['annual_totals'][$year] ?? 0;
-                    
-                    if ($type === 'avg') {
-                        $unique_months = count($row['annual_months_count'][$year] ?? []);
-                        $val = ($unique_months > 0) ? ($annual_total / $unique_months) : 0;
-                    } else {
-                        $val = $annual_total;
-                    }
-                    
-                    $yearly_key = "YEARLY-{$year}|{$type}";
-                    $summary_rows[$key]['months'][$yearly_key] = $val;
+                    $yearly_key = "YEARLY-{$year}|total";
+                    $summary_rows[$key]['months'][$yearly_key] = $annual_total;
                 }
+                
                 $summary_rows[$key]['row_ids'] = implode(',', array_unique($summary_rows[$key]['row_ids']));
                 
                 unset($summary_rows[$key]['annual_totals']);
@@ -247,18 +252,18 @@ class OutingController extends Controller
                     $rawNominal = $clean($row[8]);
                     $nominal = (float) str_replace(['.', ','], ['', '.'], $rawNominal);
                     if (strpos($rawNominal, ',') === false) {
-                         $nominal = (float) str_replace('.', '', $rawNominal);
+                        $nominal = (float) str_replace('.', '', $rawNominal);
                     }
 
                     Outing::create([
-                        'tanggal'    => $date->format('Y-m-d'),
-                        'akun'       => $clean($row[2]),
-                        'voucher'    => $clean($row[3]),
-                        'nama'       => $clean($row[4]),
-                        'nama_pt'    => $clean($row[5]),
-                        'part'       => $clean($row[6]),
-                        'keterangan' => $clean($row[7]),
-                        'nominal'    => $nominal,
+                        'tanggal'     => $date->format('Y-m-d'),
+                        'akun'        => $clean($row[2]),
+                        'voucher'     => $clean($row[3]),
+                        'nama'        => $clean($row[4]),
+                        'nama_pt'     => $clean($row[5]),
+                        'part'        => $clean($row[6]),
+                        'keterangan'  => $clean($row[7]),
+                        'nominal'     => $nominal,
                     ]);
                     $uploadCount++;
                 }
