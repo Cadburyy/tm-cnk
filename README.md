@@ -1,44 +1,105 @@
-# Transaction Management (TM) — Setup
+# TM
 
-# 1. Go to your project directory
-cd path/to/tm
+A **Laravel-based project** built for task management and internal operations.
 
-# 2. Install backend dependencies
-composer install
+Eng Ver ---
 
-# 3. Copy environment file
-cp .env.example .env
+## 🚀 Setup Instructions
 
-# 4. Generate Laravel app key
-php artisan key:generate
+To get the **TM** project running on your local machine, follow the steps below. The process includes backend setup, database configuration, and frontend build compilation.
 
-########################################
-# 5. Create your database in phpMyAdmin:
-#    Database name example: tm_db
-#
-# Then update .env with:
-#    DB_DATABASE=tm_db
-#    DB_USERNAME=root
-#    DB_PASSWORD=
-########################################
+### 1. Initial Setup and Prerequisites
 
-# 6. Run migrations and seed roles/users
-php artisan migrate:fresh
-php artisan db:seed
+Before starting, ensure the required software is installed:
 
-# 7. Install frontend dependencies
-npm install
+* **XAMPP**: Start Apache and MySQL to act as your web and database servers.
+* **Composer**: PHP package manager for backend dependencies.
+* **Node.js & npm**: Required for installing and running frontend assets.
 
-# 8. Build frontend assets
-npm run build
+---
 
-# 9. Start Laravel server
-php artisan serve
+### 2. Project Download and Backend Configuration
 
-# 10. Open a NEW terminal and start Vite
-npm run dev
+1. Download the project files as a ZIP from the repository.
+2. Extract the ZIP and place the `tm` folder in your preferred location.
+3. Open a terminal and navigate to the project directory:
 
-########################################
-# Application will run at:
-# http://localhost:8000
-########################################
+   ```bash
+   cd path/to/tm
+   ```
+4. Install backend dependencies:
+
+   ```bash
+   composer install
+   ```
+5. Create a copy of the `.env` configuration file:
+
+   ```bash
+   cp .env.example .env
+   ```
+6. Generate your Laravel application key:
+
+   ```bash
+   php artisan key:generate
+   ```
+7. Create a new database in **phpMyAdmin**, for example: `tm_db`.
+8. Open the `.env` file and update your database configuration:
+
+   ```
+   DB_DATABASE=tm_db
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
+
+   **Optional (auto-update .env):**
+
+   ```bash
+   sed -i 's/DB_DATABASE=.*/DB_DATABASE=tm_db/' .env
+   sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
+   sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=/' .env
+   ```
+
+---
+
+### 3. Database Migration and Seeding
+
+Once the database is ready, run migrations and seed default data:
+
+1. Run the following command:
+
+   ```bash
+   php artisan migrate:fresh --seed
+   ```
+2. This will create all required tables and insert initial data.
+
+---
+
+### 4. Frontend Setup and Launch
+
+1. Install frontend dependencies:
+
+   ```bash
+   npm install
+   ```
+2. Build the frontend assets:
+
+   ```bash
+   npm run build
+   ```
+3. Start the Laravel server:
+
+   ```bash
+   php artisan serve
+   ```
+4. Open a **new** terminal and start the Vite development server:
+
+   ```bash
+   npm run dev
+   ```
+
+Your application is now running and accessible at:
+
+**[http://localhost:8000](http://localhost:8000)**
+
+---
+
