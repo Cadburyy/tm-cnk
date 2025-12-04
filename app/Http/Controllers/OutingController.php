@@ -244,7 +244,7 @@ class OutingController extends Controller
                     $clean = fn($val) => trim(mb_convert_encoding($val ?? '', 'UTF-8', 'ISO-8859-1'));
 
                     try {
-                        $date = Carbon::parse($clean($row[1]));
+                        $date = Carbon::createFromFormat('d/m/Y', $clean($row[1]));
                     } catch (\Exception $e) {
                         $date = now();
                     }
