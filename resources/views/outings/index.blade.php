@@ -332,6 +332,21 @@
 
                                 @endforeach
                             </tbody>
+                            <tfoot class="bg-warning">
+                                <tr>
+                                    <td colspan="2" class="text-end fw-bold text-dark">GRAND TOTAL</td>
+                                    @if (count($months) > 0)
+                                        @foreach($months as $m)
+                                            <td class="text-end fw-bold font-monospace text-dark">
+                                                Rp. {{ number_format($footer_totals[$m['key']] ?? 0, 2, ',', '.') }}
+                                            </td>
+                                        @endforeach
+                                    @endif
+                                    <td class="text-end fw-bold font-monospace text-dark">
+                                        Rp. {{ number_format($grand_total, 2, ',', '.') }}
+                                    </td>
+                                </tr>
+                            </tfoot>
                         </table>
                     @endif
 

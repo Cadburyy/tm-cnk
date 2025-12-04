@@ -128,6 +128,8 @@ class OutingController extends Controller
 
         $summary_rows = [];
         $months = [];
+        $footer_totals = [];
+        $grand_total = 0;
 
         if ($mode == 'resume') {
             $final_months = [];
@@ -148,6 +150,11 @@ class OutingController extends Controller
             ksort($temp_months);
             $months = array_merge($final_months, $temp_months);
 
+            // Initialize footer totals
+            foreach ($months as $k => $v) {
+                $footer_totals[$k] = 0;
+            }
+
             foreach ($outings as $out) {
                 $year = Carbon::parse($out->tanggal)->format('Y');
                 $month_year = Carbon::parse($out->tanggal)->format('Y-m');
@@ -161,6 +168,16 @@ class OutingController extends Controller
                 
                 $nominal = $out->nominal;
                 $out_id = $out->id;
+
+                // Aggregate Totals for Footer
+                $grand_total += $nominal;
+                if (isset($footer_totals[$month_year])) {
+                    $footer_totals[$month_year] += $nominal;
+                }
+                $yearlyKeyCheck = "YEARLY-{$year}|total";
+                if (isset($footer_totals[$yearlyKeyCheck])) {
+                    $footer_totals[$yearlyKeyCheck] += $nominal;
+                }
 
                 if (!isset($summary_rows[$key])) {
                     $summary_rows[$key] = [
@@ -214,7 +231,9 @@ class OutingController extends Controller
             'distinctYearMonths',
             'summary_rows',
             'months',
-            'raw_selections'
+            'raw_selections',
+            'footer_totals',
+            'grand_total'
         ));
     }
 
