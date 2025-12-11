@@ -36,7 +36,10 @@ First, ensure you have all the necessary software installed:
 
 With the database configured, you can set it up with the required tables and initial data.
 
-1.  Run the migration and seeding commands: `php artisan migrate:fresh --seed`.
+1.  Run the migration and seeding commands:
+    * `php artisan migrate:fresh`
+    * `php artisan db:seed --class=PermissionTableSeeder`
+    * `php artisan db:seed --class=CreateAdminUserSeeder`
 2.  This command will create all the necessary tables and populate them with default data for roles, permissions, and a default admin user.
 
 -----
@@ -62,7 +65,7 @@ The application will now be running and accessible at [http://localhost:8000](ht
 
 ---
 
-### **AdminTeknisi**
+### **Admin**
 
 * Able to upload csv data to details on items, budget and outing
 * Manage users, items, budgets, and outing
@@ -70,7 +73,7 @@ The application will now be running and accessible at [http://localhost:8000](ht
   
 ---
 
-### **Requestor**
+### **User**
 
 * View Dashboard
 * View Resume
